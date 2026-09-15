@@ -14,22 +14,20 @@ This is not a mockup. It is a working application built with the architecture, s
 
 ## Screenshots
 
-### Portfolio Dashboard
-![Portfolio Dashboard](assets/demo/home.png)
+### Portfolio & Yield
+| Portfolio Dashboard | Yield Deposit |
+|---------------------|---------------|
+| ![Portfolio Dashboard](assets/demo/home.png) | ![Yield Deposit](assets/demo/yield.png) |
 
-### USDC Transfer — Form & Validation
-| Send Form | Address Validation |
-|-----------|-------------------|
-| ![Send Form](assets/demo/send.png) | ![Validation](assets/demo/send-vald.png) |
+### USDC Transfer
+| Address Validation | Island Minimal (pill) |
+|-------------------|-----------------------|
+| ![Validation](assets/demo/send-vald.png) | ![Mini](assets/demo/send-island-mini.png) |
 
 ### USDC Transfer — Island Pipeline
 | Burning | Expanded | Settled |
 |---------|----------|---------|
 | ![Island Compact](assets/demo/send-island.png) | ![Island Expanded](assets/demo/send-island2.png) | ![Settled](assets/demo/send-island-success.png) |
-
-| Minimal (pill) | Mini |
-|----------------|------|
-| ![Mini](assets/demo/send-island-mini.png) | |
 
 ### Cross-Chain Bridge
 | Bridge Form | Island Overlay |
@@ -41,8 +39,7 @@ This is not a mockup. It is a working application built with the architecture, s
 |---------|----------------|----------|
 | ![FX](assets/demo/fx.png) | ![FX Island](assets/demo/fx-island.png) | ![FX Island Expanded](assets/demo/fx-island2.png) |
 
-### Yield Deposit
-![Yield Deposit](assets/demo/yield.png)
+
 
 ---
 
