@@ -12,7 +12,7 @@ This is not a mockup. It is a working application built with the architecture, s
 
 ---
 
-## Video Demo
+## Video Demo (Done on an Android device)
 
 
 
@@ -25,7 +25,7 @@ https://github.com/user-attachments/assets/006b67d1-3d66-460a-87a4-a66780452c92
 
 ---
 
-## Screenshots
+## Screenshots (IOS Device)
 
 ### Dynamic Island: USDC Transfer Pipeline
 *Instead of trapping users on a blocking loading screen, the Dynamic Island tracks standard stablecoin transfers ambiently. As the transaction processes on-chain, the user sees live state changes (Burning → Settled) directly in the pill, freeing them to continue using the app.*
