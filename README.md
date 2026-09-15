@@ -12,6 +12,40 @@ This is not a mockup. It is a working application built with the architecture, s
 
 ---
 
+## Screenshots
+
+### Portfolio Dashboard
+![Portfolio Dashboard](assets/demo/home.png)
+
+### USDC Transfer — Form & Validation
+| Send Form | Address Validation |
+|-----------|-------------------|
+| ![Send Form](assets/demo/send.png) | ![Validation](assets/demo/send-vald.png) |
+
+### USDC Transfer — Island Pipeline
+| Burning | Expanded | Settled |
+|---------|----------|---------|
+| ![Island Compact](assets/demo/send-island.png) | ![Island Expanded](assets/demo/send-island2.png) | ![Settled](assets/demo/send-island-success.png) |
+
+| Minimal (pill) | Mini |
+|----------------|------|
+| ![Mini](assets/demo/send-island-mini.png) | |
+
+### Cross-Chain Bridge
+| Bridge Form | Island Overlay |
+|-------------|----------------|
+| ![Bridge](assets/demo/bridge.png) | ![Bridge Island](assets/demo/bridge-island.png) |
+
+### Global Remittance (USDC → Fiat)
+| FX Form | Island Overlay | Expanded |
+|---------|----------------|----------|
+| ![FX](assets/demo/fx.png) | ![FX Island](assets/demo/fx-island.png) | ![FX Island Expanded](assets/demo/fx-island2.png) |
+
+### Yield Deposit
+![Yield Deposit](assets/demo/yield.png)
+
+---
+
 ## Design Inspiration
 
 The core interaction model is directly inspired by Apple's native Dynamic Island on iPhone 14 Pro and later. Apple's implementation proves that persistent, ambient status updates — music playback, timers, FaceID — can live in a non-intrusive pill at the top of the screen without disrupting the user's primary task.
