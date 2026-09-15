@@ -14,7 +14,7 @@ This is not a mockup. It is a working application built with the architecture, s
 
 ## Video Demo
 
-https://github.com/boluwatifee4/RN-in-app-dynamic-island-concept-for-stablecoin-apps/blob/5c2a1fe7a9ec8846783eb764d320a8957f91e4c4/assets/demo/stable-island.mp4
+<video src="https://github.com/boluwatifee4/RN-in-app-dynamic-island-concept-for-stablecoin-apps/raw/5c2a1fe7a9ec8846783eb764d320a8957f91e4c4/assets/demo/stable-island.mp4" controls="controls" width="100%"></video>
 
 ---
 
