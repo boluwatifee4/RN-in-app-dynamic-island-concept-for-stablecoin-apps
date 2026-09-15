@@ -1,6 +1,6 @@
-# AETHER — Stablecoin Dynamic Island
+# Stable-Island — Stablecoin Dynamic Island
 
-**AETHER** is a production-grade React Native fintech portfolio piece showcasing the Dynamic Island concept for stablecoin applications. It demonstrates how complex, asynchronous on-chain states — cross-chain bridging, gasless transfers, yield compounding, and global remittance — can be handled fluidly through a persistent status overlay without interrupting the user's primary flow.
+**Stable-Island** is a production-grade React Native fintech portfolio piece showcasing the Dynamic Island concept for stablecoin applications. It demonstrates how complex, asynchronous on-chain states — cross-chain bridging, gasless transfers, yield compounding, and global remittance — can be handled fluidly through a persistent status overlay without interrupting the user's primary flow.
 
 ---
 
@@ -36,7 +36,7 @@ This is not a mockup. It is a working application built with the architecture, s
 | ![FX](assets/demo/fx.png) | ![FX Island](assets/demo/fx-island.png) | ![FX Island Expanded](assets/demo/fx-island2.png) |
 
 ### Core App Screens & Validation
-*AETHER is built as a complete wallet experience. It includes robust forms, address validation, and interactive yield dashboards, all integrated with the island overlay.*
+*Stable-Island is built as a complete wallet experience. It includes robust forms, address validation, and interactive yield dashboards, all integrated with the island overlay.*
 
 | Portfolio Dashboard | Yield Deposit |
 |---------------------|---------------|
@@ -53,7 +53,7 @@ This is not a mockup. It is a working application built with the architecture, s
 
 The core interaction model is directly inspired by Apple's native Dynamic Island on iPhone 14 Pro and later. Apple's implementation proves that persistent, ambient status updates — music playback, timers, FaceID — can live in a non-intrusive pill at the top of the screen without disrupting the user's primary task.
 
-AETHER applies this same principle to stablecoin transactions. Where Apple shows a timer counting down, AETHER shows a cross-chain bridge burning tokens on Base and attesting on Solana. The interaction grammar is identical: a compact pill that expands on tap to reveal detail, then collapses back when dismissed. The difference is that AETHER's island is built entirely in React Native using Reanimated spring physics, not native UIKit — proving that the concept translates beyond iOS-native apps.
+Stable-Island applies this same principle to stablecoin transactions. Where Apple shows a timer counting down, Stable-Island shows a cross-chain bridge burning tokens on Base and attesting on Solana. The interaction grammar is identical: a compact pill that expands on tap to reveal detail, then collapses back when dismissed. The difference is that Stable-Island's island is built entirely in React Native using Reanimated spring physics, not native UIKit — proving that the concept translates beyond iOS-native apps.
 
 ---
 
