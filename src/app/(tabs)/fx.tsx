@@ -206,7 +206,7 @@ export default function FxScreen() {
       <View style={styles.summaryCard}>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Payout Rail</Text>
-          <Text style={styles.summaryValue}>Aether Direct Clearing · {fiat.country}</Text>
+          <Text style={styles.summaryValue}>S-I Direct Clearing · {fiat.country}</Text>
         </View>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Settlement Speed</Text>
@@ -241,10 +241,10 @@ export default function FxScreen() {
           {!sendAmount
             ? 'Enter Amount'
             : insufficientBalance
-            ? 'Insufficient Balance'
-            : !recipientName || !accountNumber
-            ? 'Enter Beneficiary Details'
-            : `Send ${fiat.symbol}${fiatAmount} ${fiat.code}`}
+              ? 'Insufficient Balance'
+              : !recipientName || !accountNumber
+                ? 'Enter Beneficiary Details'
+                : `Send ${fiat.symbol}${fiatAmount} ${fiat.code}`}
         </Text>
       </TouchableOpacity>
     </ScrollView>

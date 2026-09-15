@@ -12,6 +12,12 @@ This is not a mockup. It is a working application built with the architecture, s
 
 ---
 
+## Video Demo
+
+<video src="assets/demo/stable-island.mp4" width="320" controls></video>
+
+---
+
 ## Screenshots
 
 ### Dynamic Island: USDC Transfer Pipeline

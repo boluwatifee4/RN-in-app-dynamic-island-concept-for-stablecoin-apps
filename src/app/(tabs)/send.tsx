@@ -272,7 +272,7 @@ export default function SendScreen() {
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Protocol</Text>
-          <Text style={styles.detailValue}>Circle CCTP · Aether Mesh</Text>
+          <Text style={styles.detailValue}>Circle CCTP · S-I Mesh</Text>
         </View>
       </View>
 

@@ -25,7 +25,7 @@ export default function HomeScreen() {
     >
       <View style={styles.header}>
         <View>
-          <Text style={styles.appName}>AETHER</Text>
+          <Text style={styles.appName}>Stable Island</Text>
           <Text style={styles.handle}>@alex.vault · Non-Custodial MPC</Text>
         </View>
         <GlowBadge label="BASE SETTLEMENT" variant="cyan" />
