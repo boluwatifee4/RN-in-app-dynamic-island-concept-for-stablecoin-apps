@@ -1,15 +1,33 @@
 {
   "name": "stable-island",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "expo-router/entry",
   "dependencies": {
+    "@expo/vector-icons": "^15.0.2",
     "expo": "~57.0.22",
+    "expo-blur": "~57.0.3",
+    "expo-clipboard": "~57.0.2",
+    "expo-constants": "~57.0.18",
+    "expo-font": "~57.0.4",
+    "expo-haptics": "~57.0.3",
+    "expo-linear-gradient": "~57.0.2",
+    "expo-linking": "~57.0.10",
+    "expo-router": "~57.0.21",
     "expo-status-bar": "~57.0.1",
+    "lottie-react-native": "~7.3.8",
+    "lucide-react-native": "^1.46.0",
     "react": "19.2.3",
-    "react-native": "0.86.3"
+    "react-native": "0.86.3",
+    "react-native-gesture-handler": "~2.32.0",
+    "react-native-reanimated": "4.5.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-worklets": "0.10.1",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "babel-preset-expo": "^57.0.11",
     "typescript": "~6.0.3"
   },
   "scripts": {
