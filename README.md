@@ -14,31 +14,37 @@ This is not a mockup. It is a working application built with the architecture, s
 
 ## Screenshots
 
-### Portfolio & Yield
-| Portfolio Dashboard | Yield Deposit |
-|---------------------|---------------|
-| ![Portfolio Dashboard](assets/demo/home.png) | ![Yield Deposit](assets/demo/yield.png) |
+### Dynamic Island: USDC Transfer Pipeline
+*Instead of trapping users on a blocking loading screen, the Dynamic Island tracks standard stablecoin transfers ambiently. As the transaction processes on-chain, the user sees live state changes (Burning → Settled) directly in the pill, freeing them to continue using the app.*
 
-### USDC Transfer
-| Address Validation | Island Minimal (pill) |
-|-------------------|-----------------------|
-| ![Validation](assets/demo/send-vald.png) | ![Mini](assets/demo/send-island-mini.png) |
-
-### USDC Transfer — Island Pipeline
-| Burning | Expanded | Settled |
-|---------|----------|---------|
+| Burning | Expanded Details | Settled |
+|---------|------------------|---------|
 | ![Island Compact](assets/demo/send-island.png) | ![Island Expanded](assets/demo/send-island2.png) | ![Settled](assets/demo/send-island-success.png) |
 
-### Cross-Chain Bridge
+### Dynamic Island: Cross-Chain Bridging
+*Cross-chain transfers via protocols like CCTP involve multi-minute, multi-stage pipelines (Burn → Attest → Mint). The Island overlay perfectly manages this complex asynchronous process, giving users real-time visibility into bridging status without interrupting their flow.*
+
 | Bridge Form | Island Overlay |
 |-------------|----------------|
 | ![Bridge](assets/demo/bridge.png) | ![Bridge Island](assets/demo/bridge-island.png) |
 
-### Global Remittance (USDC → Fiat)
-| FX Form | Island Overlay | Expanded |
-|---------|----------------|----------|
+### Dynamic Island: Global Remittance (USDC → Fiat)
+*Converting crypto to fiat involves locking an FX rate and waiting for off-chain fiat rails to settle. The expandable island provides a persistent, interactive receipt that updates live as the funds move across borders.*
+
+| FX Form | Island Overlay | Expanded View |
+|---------|----------------|---------------|
 | ![FX](assets/demo/fx.png) | ![FX Island](assets/demo/fx-island.png) | ![FX Island Expanded](assets/demo/fx-island2.png) |
 
+### Core App Screens & Validation
+*AETHER is built as a complete wallet experience. It includes robust forms, address validation, and interactive yield dashboards, all integrated with the island overlay.*
+
+| Portfolio Dashboard | Yield Deposit |
+|---------------------|---------------|
+| ![Portfolio Dashboard](assets/demo/home.png) | ![Yield Deposit](assets/demo/yield.png) |
+
+| Address Validation | Island Minimal (pill) |
+|-------------------|-----------------------|
+| ![Validation](assets/demo/send-vald.png) | ![Mini](assets/demo/send-island-mini.png) |
 
 
 ---
