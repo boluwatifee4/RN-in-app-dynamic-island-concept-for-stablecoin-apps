@@ -1,48 +1,110 @@
-# Stable-Island
+# AETHER — Stablecoin Dynamic Island
 
-**Stable-Island** is a React Native architectural showcase that pushes the boundary of what the Dynamic Island can do, moving past simple static UI indicators into interactive, ambient workflows for Web3 and Fintech.
-
-Designed specifically for the Stablecoin and Digital Dollar ecosystem, it demonstrates how complex, asynchronous on-chain states—such as cross-chain bridging, gasless paymasters, yield compounding, and remittance locking—can be handled fluidly without interrupting the user's primary application flow.
+**AETHER** is a production-grade React Native fintech portfolio piece showcasing the Dynamic Island concept for stablecoin applications. It demonstrates how complex, asynchronous on-chain states — cross-chain bridging, gasless transfers, yield compounding, and global remittance — can be handled fluidly through a persistent status overlay without interrupting the user's primary flow.
 
 ---
 
-## Architectural Principles
+## What This Is
 
-This codebase is engineered to reflect senior-level React Native patterns, stepping away from monolithic UI files and mock data, into a strictly separated, production-ready environment.
+A fully functional mobile app that simulates a non-custodial MPC wallet settlement layer. Every screen has a real form with validation, balance deduction, fee disclosure, and address validation. When a transaction is submitted, a Dynamic Island-style overlay tracks the pipeline from burn through attestation to mint — with live progress, stage-specific colors, and auto-dismiss.
 
-### Feature-Driven Architecture
-The codebase is structured by domain boundaries (`src/features/`), ensuring that state, UI, and side-effects remain encapsulated per business function.
-
-### Deterministic Motion & Physics
-All animations are driven by Reanimated 4.x using a unified `useIslandPhysics` custom hook. By centralizing physics configuration (stiffness, damping, mass) into a design token system (`motion.ts`), the interaction model remains cohesive and strictly decoupled from the presentation components.
-
-### Performance & Re-rendering Defenses
-- View components are strictly presentational.
-- Business logic, timer intervals, and animation interpolation math are isolated in custom hooks.
-- Component boundaries are hardened using `React.memo` and referentially stable callbacks (`useCallback`), preventing render cascades during high-frequency updates like the 60fps yield ticker.
-- Animations utilize native Reanimated Shared Values, keeping all layout interpolations strictly on the UI thread.
-
-### Clean Code & Iconography
-The UI strictly relies on standard `@expo/vector-icons` (Ionicons) and vector graphics, ensuring resolution independence and avoiding unprofessional emoji-based pseudo-icons.
+This is not a mockup. It is a working application built with the architecture, state management, and UX patterns you would ship to production.
 
 ---
 
-## Core Capabilities
+## Design Inspiration
 
-### Multi-Chain CCTP Relay
-An interactive, ambient bridge interface supporting Base, Solana, Arbitrum, Polygon, and Ethereum. It features a toggleable ERC-4337 gasless paymaster and live visual finality meters for the Burn/Attest/Mint pipeline.
+The core interaction model is directly inspired by Apple's native Dynamic Island on iPhone 14 Pro and later. Apple's implementation proves that persistent, ambient status updates — music playback, timers, FaceID — can live in a non-intrusive pill at the top of the screen without disrupting the user's primary task.
 
-### Remittance & FX Engine
-A 3D perspective-flipping card mechanism (`rotateY` with `perspective`) that smoothly transitions a user from a digital dollar holding to a fiat payout destination (e.g., local banks), complete with real-time rate lock countdowns.
+AETHER applies this same principle to stablecoin transactions. Where Apple shows a timer counting down, AETHER shows a cross-chain bridge burning tokens on Base and attesting on Solana. The interaction grammar is identical: a compact pill that expands on tap to reveal detail, then collapses back when dismissed. The difference is that AETHER's island is built entirely in React Native using Reanimated spring physics, not native UIKit — proving that the concept translates beyond iOS-native apps.
 
-### On-Chain Inspector
-A diagnostic lens connected directly to public RPC endpoints (e.g., Base Mainnet) providing real block confirmations and gas metrics. It includes a calldata inspector that toggles between decoded human-readable methods and raw EVM bytecode.
+---
 
-### 60 FPS Yield Streamer
-A precision micro-yield accrual engine calculating and streaming yield smoothly via UI-thread intervals. Includes interactive compounding projections across 1M, 6M, 1Y, and 5Y horizons.
+## Future: Native Dynamic Island Handoff
 
-### Multi-Recipient Batch Payout
-A horizontally swipable deck designed for payroll and bulk transfers, integrated with 1-click batch settlement features.
+The current implementation uses an in-app overlay that mimics the Dynamic Island's behavior. The planned next step is a native handoff — when the user backgrounds the app during an active transaction, the status automatically transfers to Apple's real Dynamic Island via ActivityKit and WidgetKit.
+
+The architecture for this is straightforward:
+1. **Expo Native Module** (Swift) bridges React Native to ActivityKit
+2. **WidgetKit Extension** renders the Live Activity in the Dynamic Island with compact, minimal, and expanded states
+3. **App Group** shares transaction state between the app and the widget extension
+4. **JS API** (`startActivity`, `updateActivity`, `endActivity`) mirrors the in-app transaction lifecycle
+
+The data model (`TransactionAttributes`) carries the same fields the in-app island uses — title, subtitle, type, stage, and progress — so the handoff is seamless. The user sees the in-app overlay while using the app, then the native Dynamic Island takes over when they switch away. No duplicate state, no gaps.
+
+This is the natural evolution of the concept: the in-app overlay proves the interaction model works, and the native extension makes it persistent beyond the app's lifecycle.
+
+---
+
+## Stablecoin Concepts Implemented
+
+### Cross-Chain Transfer (CCTP Pipeline)
+Real-time simulation of the Burn → Attest → Mint pipeline used by protocols like Circle's CCTP. Each stage has its own timing, progress tracking, and visual treatment. The island overlay shows the current stage with a progress bar and percentage.
+
+### Gasless Paymaster Transfers
+ERC-4337 style gasless transfers where the network fee is abstracted away from the user. Fee disclosure shows the actual gas cost hidden behind a "gasless" label, with the real cost visible in the breakdown.
+
+### Global Remittance (USDC → Fiat)
+A 4-step form simulating USDC-to-fiat remittance with realistic FX spreads (0.5–1.5%). The flow includes recipient details, bank selection, and a confirmation step with fee disclosure showing network fee + FX spread + total cost.
+
+### Yield Deposits
+Deposit flow into yield vaults (Aave v3, Morpho, Compound) with gas cost disclosure. The vault selector shows APY rates, and the confirmation includes the estimated gas cost.
+
+### Live Peg Monitoring
+A depeg warning system that polls CoinGecko every 30 seconds for USDC/USDC/EURC prices. Three alert thresholds:
+- **0.5% deviation** → Yellow warning banner
+- **2% deviation** → Red critical alert
+- **5% deviation** → Transaction halt warning
+
+### On-Chain RPC Inspector
+Live block number and gas price (gwei) fetched from Base Mainnet RPC. Displayed as a live badge in the app header.
+
+---
+
+## Architecture
+
+### Navigation
+Expo Router file-based routing with 5 tabs: Portfolio, Send, Bridge, FX, Yield.
+
+### State Management
+Zustand store (`src/store/useStableStore.ts`) managing:
+- Multi-currency balances (USDC, USDT, EURC) with live deduction
+- Transaction lifecycle (start → stage updates → complete/fail → dismiss)
+- Flow state per screen
+- Ledger history
+
+### Design System
+Single source of truth for design tokens:
+- `src/design-system/tokens/colors.ts` — `COLORS` and `RADIUS` constants
+- Dark-mode-first with deep blacks (`#07080B`, `#090B0E`)
+- No emoji anywhere in the UI — all icons via `@expo/vector-icons`
+
+### Island Overlay
+A transaction status overlay (`src/components/island/StableIsland.tsx`) that:
+- Appears automatically when a transaction is submitted
+- Shows pipeline progress with stage-specific colors (burning → rose, attesting → amber, minting → cyan, settled → emerald)
+- Auto-expands on transaction start
+- Auto-collapses 4.5s after settlement, 5s after failure
+- Spring-physics animations via `useIslandPhysics` hook
+
+### Performance
+- `React.memo` on all display components
+- `useCallback` for referentially stable callbacks
+- Native Reanimated shared values for UI-thread animations
+- Zustand selectors to minimize re-renders
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Expo SDK 57, React Native 0.86.3 |
+| Navigation | Expo Router (file-based) |
+| State | Zustand |
+| Animation | React Native Reanimated 4.x |
+| Language | TypeScript 6.0 (strict mode) |
+| Icons | Ionicons via `@expo/vector-icons` |
 
 ---
 
@@ -50,26 +112,47 @@ A horizontally swipable deck designed for payroll and bulk transfers, integrated
 
 ### Requirements
 - Node.js >= 18
-- Expo SDK 57 / React Native 0.86+
+- Expo CLI (`npm install -g expo-cli`)
+- iOS Simulator or Android Emulator
 
-### Installation & Run
+### Installation
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/your-username/stable-island.git
-   cd stable-island
-   ```
+```bash
+git clone https://github.com/your-username/stable-island.git
+cd stable-island
+npm install
+npx expo start
+```
 
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+Press `i` for iOS, `a` for Android, `w` for Web.
 
-3. **Start the development server:**
-   ```bash
-   npx expo start
-   ```
-   Press `i` to launch the iOS Simulator, `a` for the Android Emulator, or `w` for the Web version.
+---
+
+## Project Structure
+
+```
+src/
+├── app/                    # Expo Router screens
+│   ├── _layout.tsx         # Root stack + island overlay
+│   └── (tabs)/
+│       ├── _layout.tsx     # Tab navigator
+│       ├── index.tsx       # Portfolio dashboard
+│       ├── send.tsx        # USDC transfer
+│       ├── bridge.tsx      # Cross-chain bridge
+│       ├── fx.tsx          # Global remittance
+│       └── yield.tsx       # Yield deposit
+├── components/
+│   ├── island/             # Dynamic Island overlay
+│   ├── ledger/             # Dashboard cards
+│   └── ui/                 # Shared UI components
+├── design-system/
+│   └── tokens/             # Colors, radii
+├── features/
+│   └── island-engine/      # Physics hook
+├── services/               # RPC, FX, market data
+├── store/                  # Zustand store
+└── constants/              # Types, currencies, chains
+```
 
 ---
 

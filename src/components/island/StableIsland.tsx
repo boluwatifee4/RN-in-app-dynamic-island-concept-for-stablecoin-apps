@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useCallback } from 'react';
+import React, { memo, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../design-system/tokens/colors';
 import { useStableStore, type TransactionStatus } from '../../store/useStableStore';
 import { useIslandPhysics } from '../../features/island-engine/hooks/useIslandPhysics';
+import * as LiveActivity from '../../../modules/stable-island-activity';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const EXPANDED_WIDTH = Math.min(SCREEN_WIDTH - 24, 380);
@@ -52,11 +53,44 @@ export const StableIsland = memo(function StableIsland({ onDismiss }: StableIsla
     dismiss,
     markIdle,
     islandContainerStyle,
-    backdropStyle,
+    pillStyle,
+    expandedStyle,
   } = useIslandPhysics(visible, EXPANDED_WIDTH, insets.top, useCallback(() => {
     dismissTransaction();
     onDismiss?.();
   }, [dismissTransaction, onDismiss]));
+
+  const liveActivityIdRef = useRef<string | null>(null);
+  const lastStageRef = useRef<TransactionStatus['stage'] | null>(null);
+
+  // Start Live Activity when transaction starts
+  useEffect(() => {
+    if (transaction && transaction.stage !== 'idle' && transaction.stage !== lastStageRef.current) {
+      if (lastStageRef.current === null) {
+        LiveActivity.startActivity(transaction.title, transaction.subtitle, transaction.type);
+      }
+      lastStageRef.current = transaction.stage;
+    }
+  }, [transaction?.id, transaction?.stage]);
+
+  // Update Live Activity on stage change
+  useEffect(() => {
+    if (transaction && transaction.stage !== 'idle') {
+      LiveActivity.updateActivity(transaction.stage, transaction.progress);
+    }
+  }, [transaction?.stage, transaction?.progress]);
+
+  // End Live Activity on settle/fail
+  useEffect(() => {
+    if (transaction?.stage === 'settled') {
+      LiveActivity.endActivity('settled');
+      lastStageRef.current = null;
+    }
+    if (transaction?.stage === 'failed') {
+      LiveActivity.endActivity('failed');
+      lastStageRef.current = null;
+    }
+  }, [transaction?.stage]);
 
   // Auto-expand when transaction starts (only for active stages)
   useEffect(() => {
@@ -248,23 +282,21 @@ export const StableIsland = memo(function StableIsland({ onDismiss }: StableIsla
 
   return (
     <>
-      {isExpanded && (
-        <TouchableWithoutFeedback onPress={() => { if (!isActive(transaction.stage)) collapseTray(); }}>
-          <Animated.View style={[styles.backdrop, backdropStyle]} />
-        </TouchableWithoutFeedback>
-      )}
-
       <Animated.View style={[styles.island, islandContainerStyle]}>
         {!isExpanded ? (
           <Pressable onPress={expandTray} style={styles.pillPressable}>
-            {renderPill()}
+            <Animated.View style={pillStyle}>
+              {renderPill()}
+            </Animated.View>
           </Pressable>
         ) : (
           <View style={styles.expandedWrapper}>
             <Pressable onPress={() => { if (!isActive(transaction.stage)) collapseTray(); }} style={styles.handleBar}>
               <View style={styles.handlePill} />
             </Pressable>
-            {renderExpanded()}
+            <Animated.View style={expandedStyle}>
+              {renderExpanded()}
+            </Animated.View>
           </View>
         )}
       </Animated.View>
@@ -282,11 +314,6 @@ function isActive(stage: TransactionStatus['stage']): boolean {
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: '#000',
-    zIndex: 998,
-  },
   island: {
     position: 'absolute',
     alignSelf: 'center',
