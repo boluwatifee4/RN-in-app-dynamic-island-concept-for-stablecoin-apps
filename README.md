@@ -12,10 +12,14 @@ This is not a mockup. It is a working application built with the architecture, s
 
 ---
 
-## Video Demo (Done on an Android device)
+## Video Demos
+
+### iOS (Dynamic Island device)
+<!-- TODO: replace with the iOS screen recording link once uploaded -->
 
 
 
+### Android
 https://github.com/user-attachments/assets/006b67d1-3d66-460a-87a4-a66780452c92
 
 
