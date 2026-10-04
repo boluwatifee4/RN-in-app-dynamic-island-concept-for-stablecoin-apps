@@ -126,16 +126,17 @@ Zustand store (`src/store/useStableStore.ts`) managing:
 ### Design System
 Single source of truth for design tokens:
 - `src/design-system/tokens/colors.ts` — `COLORS` and `RADIUS` constants
-- Dark-mode-first with deep blacks (`#07080B`, `#090B0E`)
+- Dark-mode-first with deep blacks (`#07080B`, pure `#000000` on the island)
 - No emoji anywhere in the UI — all icons via `@expo/vector-icons`
 
 ### Island Overlay
-A transaction status overlay (`src/components/island/StableIsland.tsx`) that:
-- Appears automatically when a transaction is submitted
-- Shows pipeline progress with stage-specific colors (burning → rose, attesting → amber, minting → cyan, settled → emerald)
-- Auto-expands on transaction start
+A transaction status overlay (`src/components/island/StableIsland.tsx`) that clones the system Dynamic Island:
+- Pure-black 37pt capsule (radius = height / 2), flush with the hardware cutout inside the safe area
+- Compact state shows leading indicator + trailing value only — the center is reserved for the sensor housing, like the real island
+- Expanded state (160pt) uses ActivityKit-style regions: top band flanking the cutout, title/subtitle below, segmented stage progress, stage + elapsed-time footer
+- Appears automatically when a transaction is submitted; auto-expands on start
 - Auto-collapses 4.5s after settlement, 5s after failure
-- Spring-physics animations via `useIslandPhysics` hook
+- Single Reanimated spring (`ISLAND_SPRINGS.morph`, ζ ≈ 0.75) drives width/height/radius in lockstep for an Apple-like morph with subtle bounce
 
 ### Performance
 - `React.memo` on all display components

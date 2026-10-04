@@ -1,11 +1,11 @@
-import React, { memo, useEffect, useCallback, useRef } from 'react';
+import React, { memo, useEffect, useCallback, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Pressable,
-  TouchableWithoutFeedback,
-  Dimensions,
+  useWindowDimensions,
+  StatusBar,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,24 +15,30 @@ import { useStableStore, type TransactionStatus } from '../../store/useStableSto
 import { useIslandPhysics } from '../../features/island-engine/hooks/useIslandPhysics';
 import * as LiveActivity from '../../../modules/stable-island-activity';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const EXPANDED_WIDTH = Math.min(SCREEN_WIDTH - 24, 380);
-
-const STAGE_CONFIG: Record<TransactionStatus['stage'], { color: string; icon: string; label: string }> = {
-  idle: { color: COLORS.textTertiary, icon: 'ellipse-outline', label: 'Idle' },
-  burning: { color: COLORS.rose, icon: 'flame-outline', label: 'Burning' },
-  attesting: { color: COLORS.amber, icon: 'document-text-outline', label: 'Attesting' },
-  minting: { color: COLORS.cyan, icon: 'sparkles-outline', label: 'Minting' },
-  settled: { color: COLORS.emerald, icon: 'checkmark-circle', label: 'Settled' },
-  failed: { color: COLORS.rose, icon: 'close-circle-outline', label: 'Failed' },
+const STAGE_CONFIG: Record<TransactionStatus['stage'], { color: string; label: string }> = {
+  idle: { color: COLORS.textTertiary, label: 'Idle' },
+  burning: { color: COLORS.rose, label: 'Burning' },
+  attesting: { color: COLORS.amber, label: 'Attesting' },
+  minting: { color: COLORS.cyan, label: 'Minting' },
+  settled: { color: COLORS.emerald, label: 'Settled' },
+  failed: { color: COLORS.rose, label: 'Failed' },
 };
 
-const TYPE_LABELS: Record<TransactionStatus['type'], string> = {
-  bridge: 'Cross-Chain Bridge',
-  send: 'USDC Transfer',
-  remittance: 'Global Remittance',
-  yield: 'Yield Deposit',
+const SHORT_TYPE_LABELS: Record<TransactionStatus['type'], string> = {
+  bridge: 'Bridge',
+  send: 'Send',
+  remittance: 'Remit',
+  yield: 'Yield',
 };
+
+const TYPE_ICONS: Record<TransactionStatus['type'], string> = {
+  bridge: 'swap-horizontal',
+  send: 'arrow-up',
+  remittance: 'globe',
+  yield: 'trending-up',
+};
+
+const STAGE_ORDER: TransactionStatus['stage'][] = ['burning', 'attesting', 'minting', 'settled'];
 
 interface StableIslandProps {
   onDismiss?: () => void;
@@ -40,27 +46,52 @@ interface StableIslandProps {
 
 export const StableIsland = memo(function StableIsland({ onDismiss }: StableIslandProps) {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const compactWidth = windowWidth >= 430 ? 250 : windowWidth >= 390 ? 240 : 230;
+  const expandedWidth = Math.min(windowWidth - 20, 430);
+
   const transaction = useStableStore((s) => s.activeTransaction);
   const dismissTransaction = useStableStore((s) => s.dismissTransaction);
 
   const visible = transaction !== null && transaction.stage !== 'idle';
+
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!transaction || !isActive(transaction.stage)) return;
+    const startedAt = transaction.startTime;
+    const tick = () => setElapsed(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [transaction?.id, transaction?.stage]);
 
   const {
     isExpanded,
     renderMounted,
     expandTray,
     collapseTray,
-    dismiss,
     markIdle,
     islandContainerStyle,
     pillStyle,
     expandedStyle,
-  } = useIslandPhysics(visible, EXPANDED_WIDTH, insets.top, useCallback(() => {
+  } = useIslandPhysics(visible, compactWidth, expandedWidth, insets.top, useCallback(() => {
     dismissTransaction();
     onDismiss?.();
   }, [dismissTransaction, onDismiss]));
 
-  const liveActivityIdRef = useRef<string | null>(null);
+  // The system status bar paints above every app view — no zIndex can beat it.
+  // The real island covers the clock while expanded, so hide the status bar
+  // for the expanded phase and restore it once the pill is nearly compact again.
+  const [statusBarHidden, setStatusBarHidden] = useState(false);
+  useEffect(() => {
+    if (isExpanded) {
+      setStatusBarHidden(true);
+      return;
+    }
+    const timer = setTimeout(() => setStatusBarHidden(false), 350);
+    return () => clearTimeout(timer);
+  }, [isExpanded]);
+
   const lastStageRef = useRef<TransactionStatus['stage'] | null>(null);
 
   // Start Live Activity when transaction starts
@@ -122,384 +153,240 @@ export const StableIsland = memo(function StableIsland({ onDismiss }: StableIsla
   if (!renderMounted || !transaction) return null;
 
   const stageConfig = STAGE_CONFIG[transaction.stage];
-  const typeLabel = TYPE_LABELS[transaction.type];
+  const currentStageIdx = STAGE_ORDER.indexOf(transaction.stage);
 
-  // Compact Pill
+  // Compact pill — leading indicator + trailing value only; the center is
+  // reserved for the physical sensor housing, exactly like the system island.
   const renderPill = () => (
-    <View style={styles.pillInner}>
-      <View style={[styles.statusDot, { backgroundColor: stageConfig.color }]} />
-      <Text style={styles.pillText} numberOfLines={1}>
-        {transaction.title}
-      </Text>
-      <Text style={[styles.pillBadge, { color: stageConfig.color }]}>
-        {stageConfig.label}
-      </Text>
+    <View style={styles.pillRow}>
+      <Ionicons name={TYPE_ICONS[transaction.type] as any} size={22} color={stageConfig.color} />
+      {isActive(transaction.stage) ? (
+        <Text style={styles.pillPercent}>{Math.round(transaction.progress)}%</Text>
+      ) : (
+        <Ionicons
+          name={transaction.stage === 'failed' ? 'close-circle' : 'checkmark-circle'}
+          size={18}
+          color={stageConfig.color}
+        />
+      )}
     </View>
   );
 
-  // Expanded Content
+  // Expanded — ActivityKit-style regions: top band flanks the cutout,
+  // everything else sits below it.
   const renderExpanded = () => (
-    <View style={styles.expandedContent}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={[styles.headerIcon, { backgroundColor: `${stageConfig.color}20` }]}>
-            <Ionicons name={stageConfig.icon as any} size={16} color={stageConfig.color} />
+    <>
+      <View style={styles.topBand}>
+        <View style={styles.topLeading}>
+          <View style={[styles.typeChip, { backgroundColor: `${stageConfig.color}26` }]}>
+            <Ionicons name={TYPE_ICONS[transaction.type] as any} size={15} color={stageConfig.color} />
           </View>
-          <View style={styles.headerTextGroup}>
-            <Text style={styles.headerTitle} numberOfLines={1}>
-              {typeLabel}
-            </Text>
-            <Text style={styles.headerSubtitle} numberOfLines={1}>
-              {transaction.subtitle}
-            </Text>
-          </View>
+          <Text style={styles.typeLabel}>{SHORT_TYPE_LABELS[transaction.type]}</Text>
         </View>
-        <Text style={[styles.headerStage, { color: stageConfig.color }]}>
-          {stageConfig.label}
+        {isActive(transaction.stage) ? (
+          <Text style={styles.bigValue}>{Math.round(transaction.progress)}%</Text>
+        ) : (
+          <Ionicons
+            name={transaction.stage === 'failed' ? 'close-circle' : 'checkmark-circle'}
+            size={26}
+            color={transaction.stage === 'failed' ? COLORS.rose : COLORS.emerald}
+          />
+        )}
+      </View>
+
+      <View style={styles.titleBlock}>
+        <Text style={styles.title} numberOfLines={1}>
+          {transaction.title}
+        </Text>
+        <Text style={styles.subtitle} numberOfLines={1}>
+          {transaction.subtitle}
         </Text>
       </View>
 
-      {/* Pipeline Progress */}
-      <View style={styles.pipeline}>
-        {(['burning', 'attesting', 'minting', 'settled'] as const).map((stage, i) => {
-          const isPast = isStagePast(transaction.stage, stage);
-          const isCurrent = transaction.stage === stage;
+      <View style={styles.segments}>
+        {STAGE_ORDER.map((stage, i) => {
           const config = STAGE_CONFIG[stage];
-
+          const isDone = transaction.stage === 'settled' || currentStageIdx > i;
+          const isCurrent = currentStageIdx === i && transaction.stage !== 'settled';
           return (
-            <React.Fragment key={stage}>
-              <View style={styles.stageContainer}>
-                <View
-                  style={[
-                    styles.stageDot,
-                    isCurrent && {
-                      borderColor: config.color,
-                      backgroundColor: `${config.color}25`,
-                      shadowColor: config.color,
-                      shadowOffset: { width: 0, height: 0 },
-                      shadowOpacity: 0.8,
-                      shadowRadius: 5,
-                    },
-                    isPast && {
-                      borderColor: config.color,
-                      backgroundColor: config.color,
-                    },
-                    !isPast && !isCurrent && {
-                      borderColor: 'rgba(255, 255, 255, 0.1)',
-                      backgroundColor: 'rgba(255, 255, 255, 0.04)',
-                    },
-                  ]}
-                >
-                  {isPast ? (
-                    <Ionicons name="checkmark-sharp" size={10} color="#000000" />
-                  ) : (
-                    <Ionicons
-                      name={config.icon as any}
-                      size={10}
-                      color={isCurrent ? config.color : 'rgba(255, 255, 255, 0.3)'}
-                    />
-                  )}
-                </View>
-                <Text
-                  style={[
-                    styles.stageLabel,
-                    isCurrent && { color: config.color, fontWeight: '700' },
-                    isPast && { color: '#FFFFFF', fontWeight: '600' },
-                    !isPast && !isCurrent && { color: '#8E8E93' },
-                  ]}
-                >
-                  {config.label}
-                </Text>
-              </View>
-              {i < 3 && (
-                <View
-                  style={[
-                    styles.stageLine,
-                    {
-                      backgroundColor: isPast ? config.color : 'rgba(255, 255, 255, 0.08)',
-                    },
-                  ]}
-                />
-              )}
-            </React.Fragment>
+            <View
+              key={stage}
+              style={[
+                styles.segment,
+                {
+                  backgroundColor: isDone
+                    ? config.color
+                    : isCurrent
+                      ? `${config.color}4D`
+                      : 'rgba(255, 255, 255, 0.12)',
+                },
+              ]}
+            />
           );
         })}
       </View>
 
-      {/* Progress Track */}
-      <View style={styles.progressTrack}>
-        <Animated.View
-          style={[
-            styles.progressFill,
-            {
-              width: `${Math.max(5, transaction.progress)}%`,
-              backgroundColor: stageConfig.color,
-            },
-          ]}
-        />
+      <View style={styles.footer}>
+        <Text style={[styles.footerStage, { color: stageConfig.color }]}>
+          {stageConfig.label}
+        </Text>
+        {isActive(transaction.stage) && (
+          <Text style={styles.footerTime}>{formatElapsed(elapsed)}</Text>
+        )}
       </View>
-
-      {/* Detail Row */}
-      <View style={styles.detailRow}>
-        <View style={styles.detailItem}>
-          <Text style={styles.detailLabel}>Amount</Text>
-          <Text style={styles.detailValue}>{transaction.title.split('→')[0]?.trim()}</Text>
-        </View>
-        <View style={styles.detailItem}>
-          <Text style={styles.detailLabel}>Progress</Text>
-          <Text style={[styles.detailValue, { color: stageConfig.color }]}>
-            {stageConfig.label} ({Math.round(transaction.progress)}%)
-          </Text>
-        </View>
-      </View>
-
-      {/* TX Hash */}
-      {transaction.txHash && (
-        <View style={styles.hashRow}>
-          <Ionicons name="finger-print-outline" size={12} color="#8E8E93" />
-          <Text style={styles.hashText} numberOfLines={1}>
-            {transaction.txHash}
-          </Text>
-        </View>
-      )}
-
-      {/* Settled / Failed Banner */}
-      {(transaction.stage === 'settled' || transaction.stage === 'failed') && (
-        <View style={[styles.statusBanner, transaction.stage === 'settled' ? styles.bannerSuccess : styles.bannerFail]}>
-          <Ionicons
-            name={transaction.stage === 'settled' ? 'checkmark-circle' : 'close-circle'}
-            size={16}
-            color={transaction.stage === 'settled' ? COLORS.emerald : COLORS.rose}
-          />
-          <Text style={[styles.statusText, { color: transaction.stage === 'settled' ? COLORS.emerald : COLORS.rose }]}>
-            {transaction.stage === 'settled' ? 'Transaction Settled Successfully' : 'Transaction Failed'}
-          </Text>
-        </View>
-      )}
-    </View>
+    </>
   );
 
   return (
     <>
+      <StatusBar
+        hidden={statusBarHidden}
+        barStyle="light-content"
+        showHideTransition="fade"
+      />
       <Animated.View style={[styles.island, islandContainerStyle]}>
-        {!isExpanded ? (
+        <Animated.View
+          style={[styles.layer, pillStyle]}
+          pointerEvents={isExpanded ? 'none' : 'auto'}
+        >
           <Pressable onPress={expandTray} style={styles.pillPressable}>
-            <Animated.View style={pillStyle}>
-              {renderPill()}
-            </Animated.View>
+            {renderPill()}
           </Pressable>
-        ) : (
-          <View style={styles.expandedWrapper}>
-            <Pressable onPress={() => { if (!isActive(transaction.stage)) collapseTray(); }} style={styles.handleBar}>
-              <View style={styles.handlePill} />
-            </Pressable>
-            <Animated.View style={expandedStyle}>
-              {renderExpanded()}
-            </Animated.View>
-          </View>
-        )}
+        </Animated.View>
+
+        <Animated.View
+          style={[styles.layer, expandedStyle]}
+          pointerEvents={isExpanded ? 'auto' : 'none'}
+        >
+          <Pressable
+            onPress={() => {
+              if (!isActive(transaction.stage)) {
+                markIdle();
+                collapseTray();
+              }
+            }}
+            style={styles.expandedPressable}
+          >
+            {renderExpanded()}
+          </Pressable>
+        </Animated.View>
       </Animated.View>
     </>
   );
 });
 
-function isStagePast(current: TransactionStatus['stage'], check: TransactionStatus['stage']): boolean {
-  const order: TransactionStatus['stage'][] = ['burning', 'attesting', 'minting', 'settled'];
-  return order.indexOf(current) > order.indexOf(check);
-}
-
 function isActive(stage: TransactionStatus['stage']): boolean {
   return stage === 'burning' || stage === 'attesting' || stage === 'minting';
+}
+
+function formatElapsed(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
 const styles = StyleSheet.create({
   island: {
     position: 'absolute',
     alignSelf: 'center',
-    backgroundColor: '#090B0E',
+    backgroundColor: '#000000',
     zIndex: 999,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 18,
-    elevation: 12,
     overflow: 'hidden',
+  },
+  layer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   pillPressable: {
     flex: 1,
-    height: 44,
-    justifyContent: 'center',
-    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexDirection: 'row',
+    paddingHorizontal: 10,
   },
-  pillInner: {
+  pillRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 10,
+    width: '100%',
   },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  pillText: {
-    flex: 1,
+  pillPercent: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#FFFFFF',
-    letterSpacing: 0.2,
   },
-  pillBadge: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  expandedWrapper: {
+  expandedPressable: {
+    flex: 1,
+    justifyContent: 'space-between',
+    paddingTop: 6,
     paddingHorizontal: 16,
     paddingBottom: 14,
   },
-  handleBar: {
-    width: '100%',
-    paddingVertical: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  handlePill: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-  },
-  expandedContent: {
-    gap: 6,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  headerIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTextGroup: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  headerSubtitle: {
-    fontSize: 11,
-    color: '#8E8E93',
-    marginTop: 1,
-  },
-  headerStage: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  pipeline: {
+  topBand: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 2,
   },
-  stageContainer: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  stageDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stageLabel: {
-    fontSize: 9,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-  },
-  stageLine: {
-    flex: 1,
-    height: 1.5,
-    marginHorizontal: 3,
-    marginBottom: 16,
-    borderRadius: 1,
-  },
-  progressTrack: {
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 1.5,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 6,
-  },
-  detailItem: {
-    gap: 2,
-  },
-  detailLabel: {
-    fontSize: 9,
-    color: '#8E8E93',
-    letterSpacing: 0.3,
-  },
-  detailValue: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    fontFamily: 'Courier',
-  },
-  hashRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 4,
-  },
-  hashText: {
-    fontSize: 10,
-    fontFamily: 'Courier',
-    color: '#8E8E93',
-    flex: 1,
-  },
-  statusBanner: {
+  topLeading: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    borderRadius: 10,
-    padding: 10,
-    marginTop: 6,
   },
-  bannerSuccess: {
-    backgroundColor: 'rgba(0, 242, 157, 0.1)',
+  typeChip: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  bannerFail: {
-    backgroundColor: 'rgba(244, 63, 94, 0.1)',
-  },
-  statusText: {
-    fontSize: 11,
+  typeLabel: {
+    fontSize: 13,
     fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  bigValue: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  titleBlock: {
+    gap: 2,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  subtitle: {
+    fontSize: 13,
+    fontWeight: '400',
+    color: '#8E8E93',
+  },
+  segments: {
+    flexDirection: 'row',
+    gap: 5,
+  },
+  segment: {
     flex: 1,
+    height: 5,
+    borderRadius: 2.5,
+  },
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  footerStage: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  footerTime: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#8E8E93',
+    fontVariant: ['tabular-nums'],
   },
 });

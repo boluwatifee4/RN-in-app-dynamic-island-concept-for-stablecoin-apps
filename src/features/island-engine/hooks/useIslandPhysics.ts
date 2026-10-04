@@ -9,24 +9,25 @@ import {
   cancelAnimation,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { ISLAND_SPRINGS } from '../../../design-system/tokens/motion';
 
 export const ISLAND_SPECS = {
-  COMPACT_HEIGHT: 44,
-  COMPACT_WIDTH: 220,
-  COMPACT_RADIUS: 22,
+  // Matches the hardware cutout: 37pt capsule, radius = height / 2.
+  COMPACT_HEIGHT: 37,
+  COMPACT_RADIUS: 18.5,
 
-  EXPANDED_HEIGHT: 260,
+  EXPANDED_HEIGHT: 160,
   EXPANDED_RADIUS: 42,
 
-  // Apple-like spring physics
-  SPRING_SNAPPY: { damping: 18, stiffness: 220, mass: 0.8 },
-  SPRING_SMOOTH: { damping: 24, stiffness: 160, mass: 1 },
-  SPRING_EXPAND: { damping: 14, stiffness: 240, mass: 0.75 },
-  SPRING_COLLAPSE: { damping: 20, stiffness: 280, mass: 0.7 },
+  // Distance from the physical screen top to the hardware cutout top
+  // (≈11pt when topInset is 59, ≈14pt when topInset is 62).
+  CUTOUT_TOP_INSET: 48,
+  MIN_TOP_OFFSET: 8,
 };
 
 export function useIslandPhysics(
   visible: boolean,
+  compactWidth: number,
   expandedWidth: number,
   topInset: number,
   onDismiss?: () => void
@@ -37,13 +38,13 @@ export function useIslandPhysics(
 
   const containerOpacity = useSharedValue(visible ? 1 : 0);
   const containerScale = useSharedValue(visible ? 1 : 0);
-  
-  const width = useSharedValue(ISLAND_SPECS.COMPACT_WIDTH);
+
+  const width = useSharedValue(compactWidth);
   const height = useSharedValue(ISLAND_SPECS.COMPACT_HEIGHT);
   const borderRadius = useSharedValue(ISLAND_SPECS.COMPACT_RADIUS);
 
-  // Staggered contents
-  const pillContentOpacity = useSharedValue(visible && !isExpanded ? 1 : 0);
+  // Crossfaded content — both trees stay mounted so fades actually play.
+  const pillContentOpacity = useSharedValue(visible ? 1 : 0);
   const expandedContentOpacity = useSharedValue(0);
 
   const collapseTray = useCallback(() => {
@@ -51,34 +52,33 @@ export function useIslandPhysics(
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setIsExpanded(false);
 
-    // Fade out expanded content first
-    expandedContentOpacity.value = withTiming(0, { duration: 100 });
-    
-    // Then collapse the container with a delay
-    width.value = withDelay(100, withSpring(ISLAND_SPECS.COMPACT_WIDTH, ISLAND_SPECS.SPRING_COLLAPSE));
-    height.value = withDelay(100, withSpring(ISLAND_SPECS.COMPACT_HEIGHT, ISLAND_SPECS.SPRING_COLLAPSE));
-    borderRadius.value = withDelay(100, withSpring(ISLAND_SPECS.COMPACT_RADIUS, ISLAND_SPECS.SPRING_COLLAPSE));
+    // Expanded content out immediately, shape morphs right away too.
+    expandedContentOpacity.value = withTiming(0, { duration: 90 });
 
-    // Finally fade pill content back in
-    pillContentOpacity.value = withDelay(220, withTiming(1, { duration: 200 }));
-  }, [width, height, borderRadius, expandedContentOpacity, pillContentOpacity]);
+    width.value = withSpring(compactWidth, ISLAND_SPRINGS.morph);
+    height.value = withSpring(ISLAND_SPECS.COMPACT_HEIGHT, ISLAND_SPRINGS.morph);
+    borderRadius.value = withSpring(ISLAND_SPECS.COMPACT_RADIUS, ISLAND_SPRINGS.morph);
+
+    // Compact content fades in once the capsule is nearly reformed.
+    pillContentOpacity.value = withDelay(140, withTiming(1, { duration: 160 }));
+  }, [compactWidth, width, height, borderRadius, expandedContentOpacity, pillContentOpacity]);
 
   const expandTray = useCallback(() => {
+    if (isActiveRef.current) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     isActiveRef.current = true;
     setIsExpanded(true);
 
-    // Fade out pill
-    pillContentOpacity.value = withTiming(0, { duration: 80 });
+    // Compact content out, shape morphs in lockstep (one spring for all axes).
+    pillContentOpacity.value = withTiming(0, { duration: 90 });
 
-    // Morph container out immediately
-    width.value = withSpring(expandedWidth, ISLAND_SPECS.SPRING_EXPAND);
-    height.value = withSpring(ISLAND_SPECS.EXPANDED_HEIGHT, ISLAND_SPECS.SPRING_SMOOTH);
-    borderRadius.value = withSpring(ISLAND_SPECS.EXPANDED_RADIUS, ISLAND_SPECS.SPRING_SMOOTH);
+    width.value = withSpring(expandedWidth, ISLAND_SPRINGS.morph);
+    height.value = withSpring(ISLAND_SPECS.EXPANDED_HEIGHT, ISLAND_SPRINGS.morph);
+    borderRadius.value = withSpring(ISLAND_SPECS.EXPANDED_RADIUS, ISLAND_SPRINGS.morph);
 
-    // Fade in expanded content with a delay so it doesn't clip
-    expandedContentOpacity.value = withDelay(140, withTiming(1, { duration: 200 }));
-  }, [width, height, borderRadius, expandedContentOpacity, pillContentOpacity, expandedWidth]);
+    // Expanded content fades in as the shape nears full size.
+    expandedContentOpacity.value = withDelay(130, withTiming(1, { duration: 170 }));
+  }, [expandedWidth, width, height, borderRadius, expandedContentOpacity, pillContentOpacity]);
 
   const markIdle = useCallback(() => {
     isActiveRef.current = false;
@@ -89,47 +89,53 @@ export function useIslandPhysics(
     cancelAnimation(pillContentOpacity);
     cancelAnimation(expandedContentOpacity);
 
-    // Fade out all contents immediately
     pillContentOpacity.value = withTiming(0, { duration: 100 });
     expandedContentOpacity.value = withTiming(0, { duration: 100 });
 
-    // Shrink
-    width.value = withSpring(ISLAND_SPECS.COMPACT_HEIGHT, ISLAND_SPECS.SPRING_COLLAPSE);
-    height.value = withSpring(ISLAND_SPECS.COMPACT_HEIGHT, ISLAND_SPECS.SPRING_COLLAPSE);
-    borderRadius.value = withSpring(ISLAND_SPECS.COMPACT_RADIUS, ISLAND_SPECS.SPRING_COLLAPSE);
+    // Snap back to a true capsule (width -> compact WIDTH) before fading out.
+    width.value = withSpring(compactWidth, ISLAND_SPRINGS.morph);
+    height.value = withSpring(ISLAND_SPECS.COMPACT_HEIGHT, ISLAND_SPRINGS.morph);
+    borderRadius.value = withSpring(ISLAND_SPECS.COMPACT_RADIUS, ISLAND_SPRINGS.morph);
 
-    // Fade/scale out whole container
     containerOpacity.value = withDelay(180, withTiming(0, { duration: 200 }));
     containerScale.value = withDelay(180, withTiming(0, { duration: 200 }, () => {
       runOnJS(setRenderMounted)(false);
       runOnJS(setIsExpanded)(false);
       if (onDismiss) runOnJS(onDismiss)();
     }));
-  }, [onDismiss, pillContentOpacity, expandedContentOpacity, width, height, borderRadius, containerOpacity, containerScale]);
+  }, [onDismiss, compactWidth, pillContentOpacity, expandedContentOpacity, width, height, borderRadius, containerOpacity, containerScale]);
 
   useEffect(() => {
     if (visible) {
       setRenderMounted(true);
-      containerOpacity.value = withSpring(1, ISLAND_SPECS.SPRING_SNAPPY);
-      containerScale.value = withSpring(1, ISLAND_SPECS.SPRING_SNAPPY);
-      
-      // Reset values if appearing fresh
+      containerOpacity.value = withSpring(1, ISLAND_SPRINGS.snappy);
+      containerScale.value = withSpring(1, ISLAND_SPRINGS.snappy);
+
       if (!isExpanded) {
-        width.value = ISLAND_SPECS.COMPACT_WIDTH;
+        width.value = compactWidth;
         height.value = ISLAND_SPECS.COMPACT_HEIGHT;
         borderRadius.value = ISLAND_SPECS.COMPACT_RADIUS;
-        pillContentOpacity.value = withDelay(140, withTiming(1, { duration: 200 }));
+        pillContentOpacity.value = withDelay(140, withTiming(1, { duration: 160 }));
       }
     } else {
       dismiss();
     }
   }, [visible]);
 
+  // Keep the resting capsule in sync if the window size changes.
+  useEffect(() => {
+    if (!isExpanded && !isActiveRef.current) {
+      width.value = compactWidth;
+    }
+  }, [compactWidth]);
+
   const islandContainerStyle = useAnimatedStyle(() => {
-    // topInset + 11 places it safely below the physical dynamic island.
-    // E.g. topInset is ~59 on iPhone 15 Pro, so top is ~70.
-    const topOffset = topInset + 11;
-    
+    // Sit flush inside the safe area, right where the hardware cutout lives.
+    const topOffset = Math.max(
+      topInset - ISLAND_SPECS.CUTOUT_TOP_INSET,
+      ISLAND_SPECS.MIN_TOP_OFFSET
+    );
+
     return {
       top: topOffset,
       width: width.value,
