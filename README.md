@@ -15,15 +15,15 @@ This is not a mockup. It is a working application built with the architecture, s
 ## Video Demos
 
 ### iOS (Dynamic Island device)
-<!-- TODO: replace with the iOS screen recording link once uploaded -->
 
+
+https://github.com/user-attachments/assets/39a42360-2069-4a29-a59d-72f67da5354b
 
 
 ### Android
-https://github.com/user-attachments/assets/006b67d1-3d66-460a-87a4-a66780452c92
 
 
-
+https://github.com/user-attachments/assets/14e665c1-58f2-460c-b160-a89f58f9f4ff
 
 
 
