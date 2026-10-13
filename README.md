@@ -16,9 +16,9 @@ The app runs and interacts end-to-end; what is *not* real is on-chain settlement
 
 | Feature | Status |
 |---------|--------|
-| Island morph animation (size, spring physics, cutout positioning) | **Real** — Reanimated springs matched to Apple's spec |
+| Island morph animation (size, spring physics, cutout positioning) | **Real** — Reanimated springs tuned to approximate the native feel |
 | Island overlays the actual hardware cutout | **Real** — `top = max(inset - 48, 8)`, status bar hidden while expanded |
-| Peg monitoring (USDC/USDT prices, 30s poll, halt guard) | **Real** — CoinGecko API calls; EURC/PYUSD are static display values |
+| Peg monitoring (USDC/USDT prices, 30s poll, halt guard) | **Real** — CoinGecko API calls; shows an offline banner when the feed is unreachable; EURC/PYUSD are static display values |
 | FX rates (NGN, KES, GHS, EUR, BRL, INR, PHP) | **Real** — `open.er-api.com` every 30s + on rate-lock expiry; static fallback if unreachable |
 | Base Mainnet RPC badge (block number, gas) | **Real** — live `eth_blockNumber`/`eth_gasPrice` calls; offline fallback is labeled as such |
 | Forms, validation, balance math, fee disclosure | **Real** — client-side logic, runs fully |
@@ -57,7 +57,7 @@ Real-time simulation of the Burn → Attest → Mint pipeline used by protocols 
 Paymaster-style gasless UX where the network fee is abstracted away from the user. Fee disclosure shows the actual gas cost hidden behind a "gasless" label, with the real cost visible in the breakdown. (Fee presentation is simulated; no ERC-4337 bundler or paymaster is invoked.)
 
 ### Global Remittance (USDC → Fiat)
-A 4-step form simulating USDC-to-fiat remittance with live exchange rates, a 30-second rate-lock countdown, and an explicit spread disclosure (0.5–1.5%). The flow includes recipient details, bank selection, and a confirmation step with fee disclosure showing network fee + FX spread + total cost.
+A 4-step form simulating USDC-to-fiat remittance with live exchange rates, a real 30-second rate lock (the payout is snapshotted at the locked rate and only re-quotes on expiry), and a 1% spread applied to the payout and disclosed before confirmation. The flow includes recipient details, bank selection, and a confirmation step with fee disclosure showing network fee + FX spread + total cost.
 
 ### Yield Deposits
 Deposit flow into yield vaults (Aave v3, Morpho, Compound) with gas cost disclosure. The vault selector shows APY rates, and the confirmation includes the estimated gas cost.
@@ -66,7 +66,9 @@ Deposit flow into yield vaults (Aave v3, Morpho, Compound) with gas cost disclos
 A depeg warning system that polls CoinGecko every 30 seconds for USDC and USDT prices (EURC and PYUSD are static display values). Three alert thresholds:
 - **0.5% deviation** → Yellow warning banner
 - **2% deviation** → Red critical alert
-- **5% deviation** → Submissions on Send, Bridge, FX, and Yield are disabled until the peg recovers
+- **5% USDC deviation** → Submissions on Send, Bridge, FX, and Yield are disabled until the peg recovers
+
+If CoinGecko is unreachable, the banner switches to an offline "peg unverified" state (with the age of the last successful fetch) rather than presenting last-known prices as verified.
 
 ### On-Chain RPC Inspector
 Block number and gas price (gwei) fetched live from Base Mainnet RPC, displayed as a badge in the app header. If the RPC is unreachable, the badge shows an offline/estimated state instead of presenting stale data as live.

@@ -88,6 +88,10 @@ interface StableStoreState {
   // Live market data (peg monitoring) — polled app-wide, consumed by the
   // depeg banner and the send/bridge/fx/yield submission guards.
   marketData: Record<string, StablecoinMarketInfo> | null;
+  /** ms epoch of last successful CoinGecko fetch; null = never fetched */
+  marketLastUpdated: number | null;
+  /** true when the last poll failed — peg unverified, data may be stale */
+  marketStale: boolean;
 
   // Live FX rates (per 1 USD) — polled app-wide, consumed by the remittance
   // screen and the portfolio balance converter.
@@ -97,7 +101,7 @@ interface StableStoreState {
   setSelectedFiatCode: (code: string) => void;
   setLiveRpc: (block: number, gas: number) => void;
   refreshMarketData: () => Promise<void>;
-  refreshFxRates: () => Promise<void>;
+  refreshFxRates: () => Promise<Record<string, number>>;
 
   // Island actions
   showIsland: (variant: IslandVariant, data: ActiveIslandState['data']) => void;
@@ -151,6 +155,8 @@ export const useStableStore = create<StableStoreState>((set, get) => ({
   activeTransaction: null,
 
   marketData: null,
+  marketLastUpdated: null,
+  marketStale: false,
 
   fxRates: null,
 
@@ -214,13 +220,19 @@ export const useStableStore = create<StableStoreState>((set, get) => ({
   setLiveRpc: (block, gas) => set({ currentBlockNumber: block, currentGasGwei: gas }),
 
   refreshMarketData: async () => {
-    const data = await fetchLiveMarketData();
-    set({ marketData: data });
+    const snap = await fetchLiveMarketData();
+    set({
+      marketData: snap.data,
+      marketStale: snap.isStale,
+      // Keep the previous timestamp on failure so the banner can show age
+      marketLastUpdated: snap.isStale ? get().marketLastUpdated : snap.lastUpdated,
+    });
   },
 
   refreshFxRates: async () => {
     const rates = await fetchLiveFxRates();
     set({ fxRates: rates });
+    return rates;
   },
 
   showIsland: (variant, data) =>

@@ -34,30 +34,61 @@ export default function FxScreen() {
   const [recipientBank, setRecipientBank] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [rateTimer, setRateTimer] = useState(30);
+  const [rateLock, setRateLock] = useState<{ code: string; rate: number; isLive: boolean } | null>(null);
 
   const parsedSend = parseFloat(sendAmount) || 0;
   const insufficientBalance = parsedSend > usdcBalance;
   const isHalted = getIsHalted(marketData, 'USDC');
   const fiat = FIAT_REMITTANCE_PAIRS[selectedFiatCode] || FIAT_LIST[0];
   const liveRate = fxRates?.[fiat.code] ?? fiat.defaultRatePerUsd;
-  const fiatAmount = parsedSend > 0 ? (parsedSend * liveRate).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
+  // The quote the user sees and transacts at — only changes on (re)lock, never
+  // under them from the app-wide poller mid-countdown.
+  const lockedRate = rateLock?.code === fiat.code ? rateLock.rate : liveRate;
+  // Midpoint of the disclosed 0.5–1.5% range, actually applied to the payout
+  const FX_SPREAD = 0.01;
+  const payout = parsedSend > 0 ? parsedSend * lockedRate * (1 - FX_SPREAD) : 0;
+  const fiatAmount = payout.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const relockRate = async () => {
+    const rates = await refreshFxRates();
+    setRateLock({ code: fiat.code, rate: rates[fiat.code] ?? fiat.defaultRatePerUsd, isLive: true });
+    setRateTimer(30);
+  };
+
+  // Adopt a live locked rate once rates arrive, and re-lock on currency switch
+  useEffect(() => {
+    if (!fxRates) return;
+    setRateLock((prev) =>
+      prev && prev.code === fiat.code && prev.isLive
+        ? prev
+        : { code: fiat.code, rate: fxRates[fiat.code] ?? fiat.defaultRatePerUsd, isLive: true }
+    );
+  }, [fxRates, fiat.code]);
+
+  useEffect(() => {
+    setRateTimer(30);
+  }, [rateLock?.code]);
 
   useEffect(() => {
     if (rateTimer <= 0) {
       // Rate lock expired — pull fresh rates and re-lock
-      refreshFxRates();
-      setRateTimer(30);
+      relockRate();
       return;
     }
     const interval = setInterval(() => setRateTimer((t) => t - 1), 1000);
     return () => clearInterval(interval);
-  }, [rateTimer, refreshFxRates]);
+  }, [rateTimer]);
 
   const handleSend = () => {
     if (!sendAmount || !recipientName || !accountNumber || insufficientBalance || isHalted) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     deductBalance(parsedSend);
-    startTransaction('remittance', `$${sendAmount} USDC → ${fiat.code}`, `To ${recipientName} (${fiat.symbol}${fiatAmount})`);
+    // Subtitle snapshots the locked rate the user was quoted
+    startTransaction(
+      'remittance',
+      `$${sendAmount} USDC → ${fiat.code}`,
+      `To ${recipientName} · ${fiat.symbol}${fiatAmount} @ 1 USDC = ${lockedRate.toLocaleString()} ${fiat.code}`
+    );
 
     setTimeout(() => updateStage('burning', 20), 500);
     setTimeout(() => updateStage('attesting', 50), 1500);
@@ -68,7 +99,7 @@ export default function FxScreen() {
     setRecipientName('');
     setAccountNumber('');
     setRecipientBank('');
-    setRateTimer(30);
+    relockRate();
   };
 
   const handleMax = () => {
@@ -125,7 +156,7 @@ export default function FxScreen() {
         <View style={styles.rateLeft}>
           <Ionicons name="trending-up" size={16} color={COLORS.amber} />
           <Text style={styles.rateText}>
-            1 USDC = {liveRate.toLocaleString()} {fiat.code}
+            1 USDC = {lockedRate.toLocaleString()} {fiat.code}
           </Text>
         </View>
 
@@ -133,8 +164,7 @@ export default function FxScreen() {
           style={styles.rateRight}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            refreshFxRates();
-            setRateTimer(30);
+            relockRate();
           }}
           activeOpacity={0.7}
         >
@@ -226,7 +256,7 @@ export default function FxScreen() {
         </View>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>FX Spread</Text>
-          <Text style={styles.summaryValue}>~0.5-1.5%</Text>
+          <Text style={styles.summaryValue}>~1.0% (applied to payout)</Text>
         </View>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Network Fee</Text>

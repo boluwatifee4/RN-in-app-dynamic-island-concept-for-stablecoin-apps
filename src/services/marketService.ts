@@ -50,27 +50,38 @@ const DEFAULT_MARKET_DATA: Record<string, StablecoinMarketInfo> = {
   },
 };
 
-export async function fetchLiveMarketData(): Promise<Record<string, StablecoinMarketInfo>> {
+export interface MarketSnapshot {
+  data: Record<string, StablecoinMarketInfo>;
+  /** ms epoch of the last successful fetch; 0 if none yet */
+  lastUpdated: number;
+  /** true when CoinGecko was unreachable — data is last-known/defaults, peg unverified */
+  isStale: boolean;
+}
+
+export async function fetchLiveMarketData(): Promise<MarketSnapshot> {
   try {
     const res = await fetch(
       'https://api.coingecko.com/api/v3/simple/price?ids=usd-coin,tether,euro-coin&vs_currencies=usd&include_24hr_vol=true'
     );
+    if (!res.ok) throw new Error(`CoinGecko HTTP ${res.status}`);
     const data = await res.json();
-    if (data) {
-      if (data['usd-coin']?.usd) {
-        DEFAULT_MARKET_DATA.USDC.priceUsd = data['usd-coin'].usd;
-        DEFAULT_MARKET_DATA.USDC.pegDeviationPercent = parseFloat(((data['usd-coin'].usd - 1) * 100).toFixed(3));
-        DEFAULT_MARKET_DATA.USDC.isPegged = Math.abs(DEFAULT_MARKET_DATA.USDC.pegDeviationPercent) < DEPEG_THRESHOLDS.warning;
-      }
-      if (data['tether']?.usd) {
-        DEFAULT_MARKET_DATA.USDT.priceUsd = data['tether'].usd;
-        DEFAULT_MARKET_DATA.USDT.pegDeviationPercent = parseFloat(((data['tether'].usd - 1) * 100).toFixed(3));
-        DEFAULT_MARKET_DATA.USDT.isPegged = Math.abs(DEFAULT_MARKET_DATA.USDT.pegDeviationPercent) < DEPEG_THRESHOLDS.warning;
-      }
+    if (!data || (!data['usd-coin']?.usd && !data['tether']?.usd)) {
+      throw new Error('CoinGecko empty payload');
     }
-    return { ...DEFAULT_MARKET_DATA };
+    if (data['usd-coin']?.usd) {
+      DEFAULT_MARKET_DATA.USDC.priceUsd = data['usd-coin'].usd;
+      DEFAULT_MARKET_DATA.USDC.pegDeviationPercent = parseFloat(((data['usd-coin'].usd - 1) * 100).toFixed(3));
+      DEFAULT_MARKET_DATA.USDC.isPegged = Math.abs(DEFAULT_MARKET_DATA.USDC.pegDeviationPercent) < DEPEG_THRESHOLDS.warning;
+    }
+    if (data['tether']?.usd) {
+      DEFAULT_MARKET_DATA.USDT.priceUsd = data['tether'].usd;
+      DEFAULT_MARKET_DATA.USDT.pegDeviationPercent = parseFloat(((data['tether'].usd - 1) * 100).toFixed(3));
+      DEFAULT_MARKET_DATA.USDT.isPegged = Math.abs(DEFAULT_MARKET_DATA.USDT.pegDeviationPercent) < DEPEG_THRESHOLDS.warning;
+    }
+    return { data: { ...DEFAULT_MARKET_DATA }, lastUpdated: Date.now(), isStale: false };
   } catch (err) {
-    return { ...DEFAULT_MARKET_DATA };
+    // DEFAULT_MARKET_DATA retains last successful values; caller must surface staleness
+    return { data: { ...DEFAULT_MARKET_DATA }, lastUpdated: 0, isStale: true };
   }
 }
 

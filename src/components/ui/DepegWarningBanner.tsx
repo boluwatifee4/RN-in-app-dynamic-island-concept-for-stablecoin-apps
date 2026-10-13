@@ -1,15 +1,41 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, RADIUS } from '../../design-system/tokens/colors';
-import { DEPEG_THRESHOLDS } from '../../services/marketService';
+import { DEPEG_THRESHOLDS, getIsHalted } from '../../services/marketService';
 import { useStableStore } from '../../store/useStableStore';
+
+function formatAge(lastUpdated: number | null): string | null {
+  if (!lastUpdated) return null;
+  const mins = Math.max(0, Math.round((Date.now() - lastUpdated) / 60000));
+  if (mins < 1) return 'just now';
+  return `${mins}m ago`;
+}
 
 export function DepegWarningBanner() {
   // Market data is polled app-wide in _layout.tsx (30s) and shared with the
   // send/bridge/fx/yield submission guards via the same store slice.
   const marketData = useStableStore((s) => s.marketData);
+  const marketStale = useStableStore((s) => s.marketStale);
+  const marketLastUpdated = useStableStore((s) => s.marketLastUpdated);
 
   if (!marketData) return null;
+
+  // Feed unreachable — same treatment as the RPC badge: never present
+  // last-known prices as a verified peg.
+  if (marketStale) {
+    const age = formatAge(marketLastUpdated);
+    return (
+      <View style={[styles.banner, styles.bannerWarning]}>
+        <Ionicons name="cloud-offline" size={16} color={COLORS.amber} />
+        <View style={styles.bannerText}>
+          <Text style={[styles.bannerTitle, { color: COLORS.amber }]}>PEG MONITOR OFFLINE</Text>
+          <Text style={styles.bannerBody}>
+            Price feed unreachable — peg unverified{age ? ` (last success: ${age})` : ''}
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   const depegged = Object.values(marketData).filter(
     (coin) => Math.abs(coin.pegDeviationPercent) >= DEPEG_THRESHOLDS.warning
@@ -22,27 +48,28 @@ export function DepegWarningBanner() {
   );
 
   const isCritical = Math.abs(worstDeviation.pegDeviationPercent) >= DEPEG_THRESHOLDS.critical;
-  const isHalt = Math.abs(worstDeviation.pegDeviationPercent) >= DEPEG_THRESHOLDS.halt;
+  // Submission guards on every screen check USDC only — claim a halt only when USDC is halted
+  const usdcHalted = getIsHalted(marketData, 'USDC');
 
   return (
     <View style={[styles.banner, isCritical ? styles.bannerCritical : styles.bannerWarning]}>
       <Ionicons
-        name={isHalt ? 'alert-circle' : 'warning'}
+        name={usdcHalted ? 'alert-circle' : 'warning'}
         size={16}
         color={isCritical ? COLORS.rose : COLORS.amber}
       />
       <View style={styles.bannerText}>
         <Text style={[styles.bannerTitle, { color: isCritical ? COLORS.rose : COLORS.amber }]}>
-          {isHalt ? 'DEPEG ALERT' : 'PEG DEVIATION'}
+          {usdcHalted ? 'DEPEG ALERT' : 'PEG DEVIATION'}
         </Text>
         <Text style={styles.bannerBody}>
           {worstDeviation.symbol} at ${worstDeviation.priceUsd.toFixed(4)} (
           {worstDeviation.pegDeviationPercent > 0 ? '+' : ''}
           {worstDeviation.pegDeviationPercent.toFixed(2)}%)
         </Text>
-        {isHalt && (
+        {usdcHalted && (
           <Text style={styles.bannerHalt}>
-            Transactions temporarily halted for {worstDeviation.symbol} — submissions are disabled until the peg recovers
+            Transactions temporarily halted for USDC — submissions are disabled until the peg recovers
           </Text>
         )}
       </View>
