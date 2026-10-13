@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, RADIUS } from '../../design-system/tokens/colors';
 import { useStableStore } from '../../store/useStableStore';
 import { STABLECOINS, FIAT_REMITTANCE_PAIRS } from '../../constants/currencies';
+import { getIsHalted } from '../../services/marketService';
 import * as Haptics from 'expo-haptics';
 
 const FIAT_LIST = Object.values(FIAT_REMITTANCE_PAIRS);
@@ -24,6 +25,9 @@ export default function FxScreen() {
   const completeTransaction = useStableStore((s) => s.completeTransaction);
   const deductBalance = useStableStore((s) => s.deductBalance);
   const usdcBalance = useStableStore((s) => s.usdcBalance);
+  const marketData = useStableStore((s) => s.marketData);
+  const fxRates = useStableStore((s) => s.fxRates);
+  const refreshFxRates = useStableStore((s) => s.refreshFxRates);
   const [sendAmount, setSendAmount] = useState('');
   const [selectedFiatCode, setSelectedFiatCode] = useState<string>('NGN');
   const [recipientName, setRecipientName] = useState('');
@@ -33,17 +37,24 @@ export default function FxScreen() {
 
   const parsedSend = parseFloat(sendAmount) || 0;
   const insufficientBalance = parsedSend > usdcBalance;
+  const isHalted = getIsHalted(marketData, 'USDC');
   const fiat = FIAT_REMITTANCE_PAIRS[selectedFiatCode] || FIAT_LIST[0];
-  const fiatAmount = parsedSend > 0 ? (parsedSend * fiat.defaultRatePerUsd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
+  const liveRate = fxRates?.[fiat.code] ?? fiat.defaultRatePerUsd;
+  const fiatAmount = parsedSend > 0 ? (parsedSend * liveRate).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
 
   useEffect(() => {
-    if (rateTimer <= 0) return;
+    if (rateTimer <= 0) {
+      // Rate lock expired — pull fresh rates and re-lock
+      refreshFxRates();
+      setRateTimer(30);
+      return;
+    }
     const interval = setInterval(() => setRateTimer((t) => t - 1), 1000);
     return () => clearInterval(interval);
-  }, [rateTimer]);
+  }, [rateTimer, refreshFxRates]);
 
   const handleSend = () => {
-    if (!sendAmount || !recipientName || !accountNumber || insufficientBalance) return;
+    if (!sendAmount || !recipientName || !accountNumber || insufficientBalance || isHalted) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     deductBalance(parsedSend);
     startTransaction('remittance', `$${sendAmount} USDC → ${fiat.code}`, `To ${recipientName} (${fiat.symbol}${fiatAmount})`);
@@ -114,7 +125,7 @@ export default function FxScreen() {
         <View style={styles.rateLeft}>
           <Ionicons name="trending-up" size={16} color={COLORS.amber} />
           <Text style={styles.rateText}>
-            1 USDC = {fiat.defaultRatePerUsd.toLocaleString()} {fiat.code}
+            1 USDC = {liveRate.toLocaleString()} {fiat.code}
           </Text>
         </View>
 
@@ -122,6 +133,7 @@ export default function FxScreen() {
           style={styles.rateRight}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            refreshFxRates();
             setRateTimer(30);
           }}
           activeOpacity={0.7}
@@ -230,21 +242,23 @@ export default function FxScreen() {
       <TouchableOpacity
         style={[
           styles.sendButton,
-          (!sendAmount || !recipientName || !accountNumber || insufficientBalance) && styles.sendButtonDisabled,
+          (!sendAmount || !recipientName || !accountNumber || insufficientBalance || isHalted) && styles.sendButtonDisabled,
         ]}
         onPress={handleSend}
-        disabled={!sendAmount || !recipientName || !accountNumber || insufficientBalance}
+        disabled={!sendAmount || !recipientName || !accountNumber || insufficientBalance || isHalted}
         activeOpacity={0.8}
       >
         <Ionicons name="paper-plane" size={18} color={COLORS.background} />
         <Text style={styles.sendText}>
-          {!sendAmount
-            ? 'Enter Amount'
-            : insufficientBalance
-              ? 'Insufficient Balance'
-              : !recipientName || !accountNumber
-                ? 'Enter Beneficiary Details'
-                : `Send ${fiat.symbol}${fiatAmount} ${fiat.code}`}
+          {isHalted
+            ? 'Halted: USDC Depeg'
+            : !sendAmount
+              ? 'Enter Amount'
+              : insufficientBalance
+                ? 'Insufficient Balance'
+                : !recipientName || !accountNumber
+                  ? 'Enter Beneficiary Details'
+                  : `Send ${fiat.symbol}${fiatAmount} ${fiat.code}`}
         </Text>
       </TouchableOpacity>
     </ScrollView>

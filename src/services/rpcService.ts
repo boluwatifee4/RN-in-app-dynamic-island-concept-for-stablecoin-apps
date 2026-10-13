@@ -9,9 +9,26 @@ export interface LiveChainState {
   baseFeeGwei: number;
   latencyMs: number;
   lastUpdated: number;
+  /** true when RPC is unreachable — block/gas are estimates, not live values */
+  isFallback: boolean;
 }
 
 const BASE_RPC_URL = 'https://mainnet.base.org';
+
+/**
+ * Shown when the RPC is unreachable. The block number is a rough estimate
+ * (1 block / 2s since 2024-09-10) and must be labelled as offline by callers.
+ */
+function offlineState(latencyMs = 0): LiveChainState {
+  return {
+    blockNumber: 21850000 + Math.floor((Date.now() - 1726000000000) / 2000),
+    gasPriceGwei: 0.0015,
+    baseFeeGwei: 0.001,
+    latencyMs,
+    lastUpdated: Date.now(),
+    isFallback: true,
+  };
+}
 
 export async function fetchLiveBaseState(): Promise<LiveChainState> {
   const startTime = Date.now();
@@ -41,8 +58,12 @@ export async function fetchLiveBaseState(): Promise<LiveChainState> {
     const [blockData, gasData] = await Promise.all([blockPromise, gasPromise]);
     const latency = Date.now() - startTime;
 
-    const blockNumber = blockData?.result ? parseInt(blockData.result, 16) : 21850000;
-    const gasWei = gasData?.result ? parseInt(gasData.result, 16) : 2000000;
+    if (!blockData?.result || !gasData?.result) {
+      return offlineState(latency);
+    }
+
+    const blockNumber = parseInt(blockData.result, 16);
+    const gasWei = parseInt(gasData.result, 16);
     const gasGwei = parseFloat((gasWei / 1e9).toFixed(4));
 
     return {
@@ -51,22 +72,15 @@ export async function fetchLiveBaseState(): Promise<LiveChainState> {
       baseFeeGwei: 0.001,
       latencyMs: latency,
       lastUpdated: Date.now(),
+      isFallback: false,
     };
   } catch (error) {
-    // Graceful fallback with simulated incrementing block
-    const fallbackBlock = 21850000 + Math.floor((Date.now() - 1726000000000) / 2000);
-    return {
-      blockNumber: fallbackBlock,
-      gasPriceGwei: 0.0015,
-      baseFeeGwei: 0.001,
-      latencyMs: 120,
-      lastUpdated: Date.now(),
-    };
+    return offlineState();
   }
 }
 
 /**
- * Generates a realistic mock/real TX hash
+ * Generates a random mock TX hash (settlement is simulated end-to-end)
  */
 export function generateTxHash(): string {
   const chars = '0123456789abcdef';

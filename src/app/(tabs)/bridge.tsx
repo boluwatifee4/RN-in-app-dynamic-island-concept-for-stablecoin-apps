@@ -14,6 +14,7 @@ import { COLORS, RADIUS } from '../../design-system/tokens/colors';
 import { useStableStore } from '../../store/useStableStore';
 import { NETWORKS } from '../../constants/chains';
 import { STABLECOINS } from '../../constants/currencies';
+import { getIsHalted } from '../../services/marketService';
 import * as Haptics from 'expo-haptics';
 
 const CHAINS = [
@@ -35,6 +36,7 @@ export default function BridgeScreen() {
   const completeTransaction = useStableStore((s) => s.completeTransaction);
   const deductBalance = useStableStore((s) => s.deductBalance);
   const usdcBalance = useStableStore((s) => s.usdcBalance);
+  const marketData = useStableStore((s) => s.marketData);
   const [sourceChain, setSourceChain] = useState<ChainId>('base');
   const [destChain, setDestChain] = useState<ChainId>('solana');
   const [amount, setAmount] = useState('');
@@ -42,11 +44,12 @@ export default function BridgeScreen() {
 
   const parsedAmount = parseFloat(amount) || 0;
   const insufficientBalance = parsedAmount > usdcBalance;
+  const isHalted = getIsHalted(marketData, 'USDC');
   const sourceData = CHAINS.find((c) => c.id === sourceChain) || CHAINS[0];
   const destData = CHAINS.find((c) => c.id === destChain) || CHAINS[1];
 
   const handleBridge = () => {
-    if (!amount || insufficientBalance) return;
+    if (!amount || insufficientBalance || isHalted) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     deductBalance(parsedAmount);
     startTransaction('bridge', `$${amount} USDC`, `${sourceData.name} → ${destData.name}`);
@@ -276,14 +279,16 @@ export default function BridgeScreen() {
 
       {/* Bridge Button */}
       <TouchableOpacity
-        style={[styles.bridgeButton, (!amount || insufficientBalance) && styles.bridgeButtonDisabled]}
+        style={[styles.bridgeButton, (!amount || insufficientBalance || isHalted) && styles.bridgeButtonDisabled]}
         onPress={handleBridge}
-        disabled={!amount || insufficientBalance}
+        disabled={!amount || insufficientBalance || isHalted}
         activeOpacity={0.8}
       >
         <Ionicons name="git-compare" size={20} color={COLORS.background} />
         <Text style={styles.bridgeText}>
-          {!amount
+          {isHalted
+            ? 'Halted: USDC Depeg'
+            : !amount
             ? 'Enter Amount to Bridge'
             : insufficientBalance
             ? 'Insufficient Balance'

@@ -1,6 +1,6 @@
 # Stable-Island — Stablecoin Dynamic Island
 
-**Stable-Island** is a production-grade React Native fintech portfolio piece showcasing the Dynamic Island concept for stablecoin applications. It demonstrates how complex, asynchronous on-chain states — cross-chain bridging, gasless transfers, yield compounding, and global remittance — can be handled fluidly through a persistent status overlay without interrupting the user's primary flow.
+**Stable-Island** is a React Native fintech portfolio piece showcasing the Dynamic Island concept for stablecoin applications. It demonstrates how complex, asynchronous on-chain states — cross-chain bridging, gasless transfers, yield compounding, and global remittance — can be handled fluidly through a persistent status overlay without interrupting the user's primary flow.
 
 ---
 
@@ -8,7 +8,26 @@
 
 A fully functional mobile app that simulates a non-custodial MPC wallet settlement layer. Every screen has a real form with validation, balance deduction, fee disclosure, and address validation. When a transaction is submitted, a Dynamic Island-style overlay tracks the pipeline from burn through attestation to mint — with live progress, stage-specific colors, and auto-dismiss.
 
-This is not a mockup. It is a working application built with the architecture, state management, and UX patterns you would ship to production.
+The app runs and interacts end-to-end; what is *not* real is on-chain settlement (see the table below).
+
+---
+
+## What's Real vs Simulated
+
+| Feature | Status |
+|---------|--------|
+| Island morph animation (size, spring physics, cutout positioning) | **Real** — Reanimated springs matched to Apple's spec |
+| Island overlays the actual hardware cutout | **Real** — `top = max(inset - 48, 8)`, status bar hidden while expanded |
+| Peg monitoring (USDC/USDT prices, 30s poll, halt guard) | **Real** — CoinGecko API calls; EURC/PYUSD are static display values |
+| FX rates (NGN, KES, GHS, EUR, BRL, INR, PHP) | **Real** — `open.er-api.com` every 30s + on rate-lock expiry; static fallback if unreachable |
+| Base Mainnet RPC badge (block number, gas) | **Real** — live `eth_blockNumber`/`eth_gasPrice` calls; offline fallback is labeled as such |
+| Forms, validation, balance math, fee disclosure | **Real** — client-side logic, runs fully |
+| Transaction pipeline (Burn → Attest → Mint) | **Simulated** — timed stage machine; no chain writes, no wallet signing |
+| Settlement & transaction hashes | **Simulated** — generated locally |
+| MPC wallet / custody layer | **Simulated** — local balance deduction only |
+| Gasless / paymaster fee waiver | **Simulated** — presentation only |
+| Yield APYs (Aave/Compound/Morpho) | **Static** — hardcoded in source, not fetched |
+| Native Dynamic Island handoff (ActivityKit) | **Not wired** — see "Next: Native Dynamic Island Handoff" |
 
 ---
 
@@ -26,6 +45,31 @@ https://github.com/user-attachments/assets/39a42360-2069-4a29-a59d-72f67da5354b
 https://github.com/user-attachments/assets/14e665c1-58f2-460c-b160-a89f58f9f4ff
 
 
+
+---
+
+## Stablecoin Concepts Implemented
+
+### Cross-Chain Transfer (CCTP Pipeline)
+Real-time simulation of the Burn → Attest → Mint pipeline used by protocols like Circle's CCTP. Each stage has its own timing, progress tracking, and visual treatment. The island overlay shows the current stage with a progress bar and percentage.
+
+### Gasless Paymaster Transfers
+Paymaster-style gasless UX where the network fee is abstracted away from the user. Fee disclosure shows the actual gas cost hidden behind a "gasless" label, with the real cost visible in the breakdown. (Fee presentation is simulated; no ERC-4337 bundler or paymaster is invoked.)
+
+### Global Remittance (USDC → Fiat)
+A 4-step form simulating USDC-to-fiat remittance with live exchange rates, a 30-second rate-lock countdown, and an explicit spread disclosure (0.5–1.5%). The flow includes recipient details, bank selection, and a confirmation step with fee disclosure showing network fee + FX spread + total cost.
+
+### Yield Deposits
+Deposit flow into yield vaults (Aave v3, Morpho, Compound) with gas cost disclosure. The vault selector shows APY rates, and the confirmation includes the estimated gas cost.
+
+### Live Peg Monitoring
+A depeg warning system that polls CoinGecko every 30 seconds for USDC and USDT prices (EURC and PYUSD are static display values). Three alert thresholds:
+- **0.5% deviation** → Yellow warning banner
+- **2% deviation** → Red critical alert
+- **5% deviation** → Submissions on Send, Bridge, FX, and Yield are disabled until the peg recovers
+
+### On-Chain RPC Inspector
+Block number and gas price (gwei) fetched live from Base Mainnet RPC, displayed as a badge in the app header. If the RPC is unreachable, the badge shows an offline/estimated state instead of presenting stale data as live.
 
 ---
 
@@ -74,44 +118,24 @@ Stable-Island applies this same principle to stablecoin transactions. Where Appl
 
 ---
 
-## Future: Native Dynamic Island Handoff
+## Next: Native Dynamic Island Handoff
 
-The current implementation uses an in-app overlay that mimics the Dynamic Island's behavior. The planned next step is a native handoff — when the user backgrounds the app during an active transaction, the status automatically transfers to Apple's real Dynamic Island via ActivityKit and WidgetKit.
+The current implementation uses an in-app overlay that mimics the Dynamic Island's behavior. It has **not** been verified on-device as a native Live Activity. The next step is a native handoff — when the user backgrounds the app during an active transaction, the status would transfer to Apple's real Dynamic Island via ActivityKit and WidgetKit.
 
-The architecture for this is straightforward:
-1. **Expo Native Module** (Swift) bridges React Native to ActivityKit
-2. **WidgetKit Extension** renders the Live Activity in the Dynamic Island with compact, minimal, and expanded states
-3. **App Group** shares transaction state between the app and the widget extension
-4. **JS API** (`startActivity`, `updateActivity`, `endActivity`) mirrors the in-app transaction lifecycle
+Scaffolding that exists today:
+1. **Expo config plugin** (`plugins/withStableIslandActivity.js`) — sets Info.plist keys and the App Group entitlement
+2. **Swift source stubs** (`modules/stable-island-activity/ios/`) — widget and Live Activity view code
 
-The data model (`TransactionAttributes`) carries the same fields the in-app island uses — title, subtitle, type, stage, and progress — so the handoff is seamless. The user sees the in-app overlay while using the app, then the native Dynamic Island takes over when they switch away. No duplicate state, no gaps.
+What is **not** done (why this is "Next", not "Done"):
+- No Widget Extension target is wired into the Xcode project, so the Swift code is never compiled into a runnable app
+- No end-to-end run on a physical Dynamic Island device
 
-This is the natural evolution of the concept: the in-app overlay proves the interaction model works, and the native extension makes it persistent beyond the app's lifecycle.
+Remaining work:
+1. **WidgetKit Extension target** renders the Live Activity in the Dynamic Island with compact, minimal, and expanded states
+2. **App Group** file sharing between the app and the widget extension
+3. **JS API** (`startActivity`, `updateActivity`, `endActivity`) mirroring the in-app transaction lifecycle
 
----
-
-## Stablecoin Concepts Implemented
-
-### Cross-Chain Transfer (CCTP Pipeline)
-Real-time simulation of the Burn → Attest → Mint pipeline used by protocols like Circle's CCTP. Each stage has its own timing, progress tracking, and visual treatment. The island overlay shows the current stage with a progress bar and percentage.
-
-### Gasless Paymaster Transfers
-ERC-4337 style gasless transfers where the network fee is abstracted away from the user. Fee disclosure shows the actual gas cost hidden behind a "gasless" label, with the real cost visible in the breakdown.
-
-### Global Remittance (USDC → Fiat)
-A 4-step form simulating USDC-to-fiat remittance with realistic FX spreads (0.5–1.5%). The flow includes recipient details, bank selection, and a confirmation step with fee disclosure showing network fee + FX spread + total cost.
-
-### Yield Deposits
-Deposit flow into yield vaults (Aave v3, Morpho, Compound) with gas cost disclosure. The vault selector shows APY rates, and the confirmation includes the estimated gas cost.
-
-### Live Peg Monitoring
-A depeg warning system that polls CoinGecko every 30 seconds for USDC/USDC/EURC prices. Three alert thresholds:
-- **0.5% deviation** → Yellow warning banner
-- **2% deviation** → Red critical alert
-- **5% deviation** → Transaction halt warning
-
-### On-Chain RPC Inspector
-Live block number and gas price (gwei) fetched from Base Mainnet RPC. Displayed as a live badge in the app header.
+The data model (`TransactionAttributes`) is designed to carry the same fields the in-app island uses — title, subtitle, type, stage, and progress — so the handoff can be seamless. This is the natural evolution of the concept: the in-app overlay proves the interaction model works, and the native extension would make it persistent beyond the app's lifecycle.
 
 ---
 
@@ -167,14 +191,13 @@ A transaction status overlay (`src/components/island/StableIsland.tsx`) that clo
 
 ### Requirements
 - Node.js >= 18
-- Expo CLI (`npm install -g expo-cli`)
 - iOS Simulator or Android Emulator
 
 ### Installation
 
 ```bash
-git clone https://github.com/your-username/stable-island.git
-cd stable-island
+git clone https://github.com/boluwatifee4/RN-in-app-dynamic-island-concept-for-stablecoin-apps.git
+cd RN-in-app-dynamic-island-concept-for-stablecoin-apps
 npm install
 npx expo start
 ```

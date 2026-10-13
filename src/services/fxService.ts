@@ -26,9 +26,10 @@ export async function fetchLiveFxRates(): Promise<Record<string, number>> {
     const res = await fetch('https://open.er-api.com/v6/latest/USD');
     const data = await res.json();
     if (data && data.rates) {
-      for (const [code, fallback] of Object.entries(cachedRates)) {
+      for (const code of Object.keys(cachedRates)) {
         if (data.rates[code]) {
-          cachedRates[code] = parseFloat(data.rates[code].toFixed(2));
+          const rate = data.rates[code];
+          cachedRates[code] = parseFloat(rate.toFixed(rate < 10 ? 4 : 2));
         }
       }
     }

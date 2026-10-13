@@ -6,6 +6,8 @@ import type {
   YieldStreamData, 
 } from '../constants/types';
 import { generateTxHash } from '../services/rpcService';
+import { fetchLiveMarketData, type StablecoinMarketInfo } from '../services/marketService';
+import { fetchLiveFxRates } from '../services/fxService';
 
 export interface LedgerItem {
   id: string;
@@ -83,9 +85,19 @@ interface StableStoreState {
   currentBlockNumber: number;
   currentGasGwei: number;
 
+  // Live market data (peg monitoring) — polled app-wide, consumed by the
+  // depeg banner and the send/bridge/fx/yield submission guards.
+  marketData: Record<string, StablecoinMarketInfo> | null;
+
+  // Live FX rates (per 1 USD) — polled app-wide, consumed by the remittance
+  // screen and the portfolio balance converter.
+  fxRates: Record<string, number> | null;
+
   // Actions
   setSelectedFiatCode: (code: string) => void;
   setLiveRpc: (block: number, gas: number) => void;
+  refreshMarketData: () => Promise<void>;
+  refreshFxRates: () => Promise<void>;
 
   // Island actions
   showIsland: (variant: IslandVariant, data: ActiveIslandState['data']) => void;
@@ -137,6 +149,10 @@ export const useStableStore = create<StableStoreState>((set, get) => ({
 
   activeIsland: null,
   activeTransaction: null,
+
+  marketData: null,
+
+  fxRates: null,
 
   ...INITIAL_FLOWS,
 
@@ -196,6 +212,16 @@ export const useStableStore = create<StableStoreState>((set, get) => ({
 
   setSelectedFiatCode: (code) => set({ selectedFiatCode: code }),
   setLiveRpc: (block, gas) => set({ currentBlockNumber: block, currentGasGwei: gas }),
+
+  refreshMarketData: async () => {
+    const data = await fetchLiveMarketData();
+    set({ marketData: data });
+  },
+
+  refreshFxRates: async () => {
+    const rates = await fetchLiveFxRates();
+    set({ fxRates: rates });
+  },
 
   showIsland: (variant, data) =>
     set({ activeIsland: { variant, visible: true, data } }),

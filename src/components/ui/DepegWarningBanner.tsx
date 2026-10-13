@@ -1,25 +1,13 @@
-import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, RADIUS } from '../../design-system/tokens/colors';
-import { fetchLiveMarketData, type StablecoinMarketInfo } from '../../services/marketService';
-
-const DEPEG_THRESHOLDS = {
-  warning: 0.5,   // > 0.5% deviation → yellow warning
-  critical: 2.0,  // > 2.0% deviation → red alert
-  halt: 5.0,      // > 5.0% deviation → halt transactions
-} as const;
+import { DEPEG_THRESHOLDS } from '../../services/marketService';
+import { useStableStore } from '../../store/useStableStore';
 
 export function DepegWarningBanner() {
-  const [marketData, setMarketData] = useState<Record<string, StablecoinMarketInfo> | null>(null);
-
-  useEffect(() => {
-    fetchLiveMarketData().then(setMarketData);
-    const interval = setInterval(() => {
-      fetchLiveMarketData().then(setMarketData);
-    }, 30000);
-    return () => clearInterval(interval);
-  }, []);
+  // Market data is polled app-wide in _layout.tsx (30s) and shared with the
+  // send/bridge/fx/yield submission guards via the same store slice.
+  const marketData = useStableStore((s) => s.marketData);
 
   if (!marketData) return null;
 
@@ -54,19 +42,12 @@ export function DepegWarningBanner() {
         </Text>
         {isHalt && (
           <Text style={styles.bannerHalt}>
-            Transactions temporarily halted for {worstDeviation.symbol}
+            Transactions temporarily halted for {worstDeviation.symbol} — submissions are disabled until the peg recovers
           </Text>
         )}
       </View>
     </View>
   );
-}
-
-export function getIsHalted(marketData: Record<string, StablecoinMarketInfo> | null, symbol: string): boolean {
-  if (!marketData) return false;
-  const coin = marketData[symbol];
-  if (!coin) return false;
-  return Math.abs(coin.pegDeviationPercent) >= DEPEG_THRESHOLDS.halt;
 }
 
 const styles = StyleSheet.create({

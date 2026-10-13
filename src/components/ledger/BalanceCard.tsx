@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { COLORS, RADIUS } from '../../design-system/tokens/colors';
 import { FIAT_REMITTANCE_PAIRS } from '../../constants/currencies';
 import { getCachedRate } from '../../services/fxService';
+import { useStableStore } from '../../store/useStableStore';
 import { GlowBadge } from '../ui/GlowBadge';
 import * as Haptics from 'expo-haptics';
 
@@ -12,10 +13,12 @@ interface BalanceCardProps {
 
 export function BalanceCard({ totalUsd }: BalanceCardProps) {
   const [selectedCurrency, setSelectedCurrency] = useState<'USD' | 'NGN' | 'EUR' | 'KES' | 'BRL'>('USD');
+  const fxRates = useStableStore((s) => s.fxRates);
 
   const currencies = ['USD', 'NGN', 'EUR', 'KES', 'BRL'] as const;
 
-  const currentRate = selectedCurrency === 'USD' ? 1 : getCachedRate(selectedCurrency);
+  const currentRate =
+    selectedCurrency === 'USD' ? 1 : (fxRates?.[selectedCurrency] ?? getCachedRate(selectedCurrency));
   const convertedTotal = (totalUsd * currentRate).toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,

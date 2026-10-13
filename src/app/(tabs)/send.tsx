@@ -14,6 +14,7 @@ import { COLORS, RADIUS } from '../../design-system/tokens/colors';
 import { useStableStore } from '../../store/useStableStore';
 import { NETWORKS } from '../../constants/chains';
 import { STABLECOINS } from '../../constants/currencies';
+import { getIsHalted } from '../../services/marketService';
 import * as Haptics from 'expo-haptics';
 
 const CHAINS = [
@@ -51,6 +52,7 @@ export default function SendScreen() {
   const completeTransaction = useStableStore((s) => s.completeTransaction);
   const deductBalance = useStableStore((s) => s.deductBalance);
   const usdcBalance = useStableStore((s) => s.usdcBalance);
+  const marketData = useStableStore((s) => s.marketData);
   const [amount, setAmount] = useState('');
   const [recipient, setRecipient] = useState('');
   const [selectedChain, setSelectedChain] = useState<'base' | 'solana' | 'arbitrum' | 'polygon' | 'ethereum'>('base');
@@ -58,10 +60,11 @@ export default function SendScreen() {
   const selectedChainData = CHAINS.find((c) => c.id === selectedChain) || CHAINS[0];
   const parsedAmount = parseFloat(amount) || 0;
   const insufficientBalance = parsedAmount > usdcBalance;
+  const isHalted = getIsHalted(marketData, 'USDC');
   const networkFee = NETWORKS[selectedChain]?.avgFeeUsd ?? 0.001;
 
   const handleSend = () => {
-    if (!amount || !recipient || insufficientBalance) return;
+    if (!amount || !recipient || insufficientBalance || isHalted) return;
     const validation = validateRecipient(recipient);
     if (!validation.valid) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -300,16 +303,16 @@ export default function SendScreen() {
 
       {/* Send Button */}
       <TouchableOpacity
-        style={[styles.sendButton, (!amount || !recipient || insufficientBalance) && styles.sendButtonDisabled]}
+        style={[styles.sendButton, (!amount || !recipient || insufficientBalance || isHalted) && styles.sendButtonDisabled]}
         accessibilityLabel="Send USDC"
         accessibilityRole="button"
         onPress={handleSend}
-        disabled={!amount || !recipient || insufficientBalance}
+        disabled={!amount || !recipient || insufficientBalance || isHalted}
         activeOpacity={0.8}
       >
         <Ionicons name="arrow-up-circle" size={20} color={COLORS.background} />
         <Text style={styles.sendText}>
-          {!amount ? 'Enter Amount' : !recipient ? 'Enter Recipient' : insufficientBalance ? 'Insufficient Balance' : `Send ${amount} USDC`}
+          {isHalted ? 'Halted: USDC Depeg' : !amount ? 'Enter Amount' : !recipient ? 'Enter Recipient' : insufficientBalance ? 'Insufficient Balance' : `Send ${amount} USDC`}
         </Text>
       </TouchableOpacity>
     </ScrollView>

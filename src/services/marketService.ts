@@ -1,6 +1,9 @@
 /**
  * Real-time Stablecoin Market & Yield Service
  * Monitors peg stability ($1.000) and live lending pool APYs (Aave / Compound).
+ *
+ * Live from CoinGecko: USDC and USDT. EURC and PYUSD ship with static
+ * defaults and are not fetched (kept for display completeness only).
  */
 
 export interface StablecoinMarketInfo {
@@ -57,14 +60,36 @@ export async function fetchLiveMarketData(): Promise<Record<string, StablecoinMa
       if (data['usd-coin']?.usd) {
         DEFAULT_MARKET_DATA.USDC.priceUsd = data['usd-coin'].usd;
         DEFAULT_MARKET_DATA.USDC.pegDeviationPercent = parseFloat(((data['usd-coin'].usd - 1) * 100).toFixed(3));
+        DEFAULT_MARKET_DATA.USDC.isPegged = Math.abs(DEFAULT_MARKET_DATA.USDC.pegDeviationPercent) < DEPEG_THRESHOLDS.warning;
       }
       if (data['tether']?.usd) {
         DEFAULT_MARKET_DATA.USDT.priceUsd = data['tether'].usd;
         DEFAULT_MARKET_DATA.USDT.pegDeviationPercent = parseFloat(((data['tether'].usd - 1) * 100).toFixed(3));
+        DEFAULT_MARKET_DATA.USDT.isPegged = Math.abs(DEFAULT_MARKET_DATA.USDT.pegDeviationPercent) < DEPEG_THRESHOLDS.warning;
       }
     }
     return { ...DEFAULT_MARKET_DATA };
   } catch (err) {
     return { ...DEFAULT_MARKET_DATA };
   }
+}
+
+export const DEPEG_THRESHOLDS = {
+  warning: 0.5,   // > 0.5% deviation → yellow warning
+  critical: 2.0,  // > 2.0% deviation → red alert
+  halt: 5.0,      // > 5.0% deviation → halt transactions
+} as const;
+
+/**
+ * Transaction guard: a USDC (or given symbol) deviation of ≥ 5% from $1.00
+ * should block new submissions until the peg recovers.
+ */
+export function getIsHalted(
+  marketData: Record<string, StablecoinMarketInfo> | null,
+  symbol: string
+): boolean {
+  if (!marketData) return false;
+  const coin = marketData[symbol];
+  if (!coin) return false;
+  return Math.abs(coin.pegDeviationPercent) >= DEPEG_THRESHOLDS.halt;
 }

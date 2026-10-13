@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, RADIUS } from '../../design-system/tokens/colors';
 import { useStableStore } from '../../store/useStableStore';
 import { STABLECOINS } from '../../constants/currencies';
+import { getIsHalted } from '../../services/marketService';
 import * as Haptics from 'expo-haptics';
 
 const VAULTS = [
@@ -30,18 +31,20 @@ export default function YieldScreen() {
   const completeTransaction = useStableStore((s) => s.completeTransaction);
   const deductBalance = useStableStore((s) => s.deductBalance);
   const usdcBalance = useStableStore((s) => s.usdcBalance);
+  const marketData = useStableStore((s) => s.marketData);
   const [selectedVault, setSelectedVault] = useState('aave');
   const [depositAmount, setDepositAmount] = useState('');
 
   const parsedDepositAmount = parseFloat(depositAmount) || 0;
   const insufficientBalance = parsedDepositAmount > usdcBalance;
+  const isHalted = getIsHalted(marketData, 'USDC');
   const vault = VAULTS.find((v) => v.id === selectedVault)!;
   const deposited = 8450;
   const currentYield = 14.8291;
   const dailyYield = (deposited * vault.apy) / 100 / 365;
 
   const handleDeposit = () => {
-    if (!depositAmount || insufficientBalance) return;
+    if (!depositAmount || insufficientBalance || isHalted) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     deductBalance(parsedDepositAmount);
     startTransaction('yield', `$${depositAmount} USDC → ${vault.name}`, `${vault.apy}% APY`);
@@ -214,14 +217,16 @@ export default function YieldScreen() {
 
       {/* Deposit Button */}
       <TouchableOpacity
-        style={[styles.depositButton, (!depositAmount || insufficientBalance) && styles.depositButtonDisabled]}
+        style={[styles.depositButton, (!depositAmount || insufficientBalance || isHalted) && styles.depositButtonDisabled]}
         onPress={handleDeposit}
-        disabled={!depositAmount || insufficientBalance}
+        disabled={!depositAmount || insufficientBalance || isHalted}
         activeOpacity={0.8}
       >
         <Ionicons name="sparkles" size={18} color={COLORS.background} />
         <Text style={styles.depositText}>
-          {!depositAmount
+          {isHalted
+            ? 'Halted: USDC Depeg'
+            : !depositAmount
             ? 'Enter Amount to Supply'
             : insufficientBalance
             ? 'Insufficient Balance'
